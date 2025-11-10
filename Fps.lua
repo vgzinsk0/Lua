@@ -1,167 +1,113 @@
--- vgzinsk V2 - Cyberpunk FPS Boost & Hacks
--- Otimizado para Galaxy A01 Android 12
-
+-- vgzinsk V3 - Cyberpunk 2099 FPS Boost
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
-local HttpService = game:GetService("HttpService")
 
--- Configurações iniciais
 local localPlayer = Players.LocalPlayer
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 
--- Sistema de salvamento
-local DATA_KEY = "vgzinskV2_Settings"
-local savedSettings = {}
-
--- Carregar configurações salvas
-local function LoadSettings()
-    local success, result = pcall(function()
-        return HttpService:JSONDecode(readfile(DATA_KEY) or "{}")
-    end)
-    if success then
-        savedSettings = result
-    else
-        savedSettings = {}
-    end
-end
-
--- Salvar configurações
-local function SaveSettings()
-    local success = pcall(function()
-        writefile(DATA_KEY, HttpService:JSONEncode(savedSettings))
-    end)
-    return success
-end
-
--- Carregar configurações ao iniciar
-LoadSettings()
-
--- Variáveis globais
+-- Configurações
+local targetFPS = 60
 local infiniteJumpEnabled = false
 local showFpsEnabled = false
 local fpsLabel = nil
 local connections = {}
 
--- Criar a GUI estilo Cyberpunk
+-- Criar GUI Cyberpunk
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "VgzinskV2_Cyberpunk"
+ScreenGui.Name = "VgzinskV3_Cyberpunk"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Frame principal com estilo cyberpunk
+-- Frame principal com efeito cyberpunk
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 350, 0, 450)
-MainFrame.Position = UDim2.new(0.5, -175, 0.5, -225)
-MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
+MainFrame.Size = UDim2.new(0, 320, 0, 400)
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -200)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
 
 -- Efeito de borda neon
-local UIGradient = Instance.new("UIGradient")
-UIGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 255)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 0, 255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 255))
-})
-UIGradient.Rotation = 45
-
 local UIStroke = Instance.new("UIStroke")
 UIStroke.Thickness = 2
-UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-UIStroke.LineJoinMode = Enum.LineJoinMode.Round
 UIStroke.Color = Color3.fromRGB(0, 255, 255)
 UIStroke.Parent = MainFrame
 
 -- Header cyberpunk
 local Header = Instance.new("Frame")
 Header.Name = "Header"
-Header.Size = UDim2.new(1, 0, 0, 40)
-Header.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+Header.Size = UDim2.new(1, 0, 0, 35)
+Header.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
 Header.BorderSizePixel = 0
-
-local HeaderGradient = Instance.new("UIGradient")
-HeaderGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 20, 40)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(40, 0, 40))
-})
-HeaderGradient.Parent = Header
 
 local Title = Instance.new("TextLabel")
 Title.Name = "Title"
 Title.Size = UDim2.new(0.7, 0, 1, 0)
-Title.Position = UDim2.new(0, 15, 0, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "⚡ vgzinsk V2 - CYBERPUNK"
+Title.Text = "⚡ VGZINSK V3"
 Title.TextColor3 = Color3.fromRGB(0, 255, 255)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Font = Enum.Font.GothamBlack
-Title.TextSize = 16
+Title.TextSize = 14
 Title.TextStrokeTransparency = 0.8
 
--- Botões header
-local MinimizeButton = CreateCyberButton("_", Color3.fromRGB(0, 150, 255))
-MinimizeButton.Position = UDim2.new(1, -70, 0, 5)
+local MinimizeButton = Instance.new("TextButton")
+MinimizeButton.Name = "MinimizeButton"
 MinimizeButton.Size = UDim2.new(0, 25, 0, 25)
+MinimizeButton.Position = UDim2.new(1, -55, 0, 5)
+MinimizeButton.BackgroundColor3 = Color3.fromRGB(0, 100, 150)
+MinimizeButton.BorderSizePixel = 0
+MinimizeButton.Text = "_"
+MinimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeButton.Font = Enum.Font.GothamBold
+MinimizeButton.TextSize = 14
 
-local CloseButton = CreateCyberButton("X", Color3.fromRGB(255, 50, 50))
-CloseButton.Position = UDim2.new(1, -35, 0, 5)
+local CloseButton = Instance.new("TextButton")
+CloseButton.Name = "CloseButton"
 CloseButton.Size = UDim2.new(0, 25, 0, 25)
+CloseButton.Position = UDim2.new(1, -25, 0, 5)
+CloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseButton.BorderSizePixel = 0
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.TextSize = 12
 
--- Abas do menu
+-- Container com abas
 local TabButtonsFrame = Instance.new("Frame")
 TabButtonsFrame.Name = "TabButtonsFrame"
-TabButtonsFrame.Size = UDim2.new(1, 0, 0, 30)
-TabButtonsFrame.Position = UDim2.new(0, 0, 0, 40)
-TabButtonsFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+TabButtonsFrame.Size = UDim2.new(1, 0, 0, 25)
+TabButtonsFrame.Position = UDim2.new(0, 0, 0, 35)
+TabButtonsFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
 TabButtonsFrame.BorderSizePixel = 0
 
 local TabsContainer = Instance.new("Frame")
 TabsContainer.Name = "TabsContainer"
-TabsContainer.Size = UDim2.new(1, -20, 1, -80)
-TabsContainer.Position = UDim2.new(0, 10, 0, 75)
+TabsContainer.Size = UDim2.new(1, -10, 1, -70)
+TabsContainer.Position = UDim2.new(0, 5, 0, 65)
 TabsContainer.BackgroundTransparency = 1
 TabsContainer.BorderSizePixel = 0
-
--- Função para criar botões cyberpunk
-function CreateCyberButton(text, color)
-    local button = Instance.new("TextButton")
-    button.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    button.BorderSizePixel = 0
-    button.Text = text
-    button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    button.Font = Enum.Font.GothamBold
-    button.TextSize = 12
-    
-    local stroke = Instance.new("UIStroke")
-    stroke.Thickness = 1
-    stroke.Color = color
-    stroke.Parent = button
-    
-    button.MouseEnter:Connect(function()
-        game:GetService("TweenService"):Create(button, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 50, 60)}):Play()
-    end)
-    
-    button.MouseLeave:Connect(function()
-        game:GetService("TweenService"):Create(button, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(30, 30, 40)}):Play()
-    end)
-    
-    return button
-end
 
 -- Sistema de abas
 local currentTab = "optimization"
 local tabs = {}
 
-function CreateTab(name, displayName)
-    local tabButton = CreateCyberButton(displayName, Color3.fromRGB(0, 255, 255))
-    tabButton.Size = UDim2.new(0.32, 0, 0, 25)
-    tabButton.Position = UDim2.new((#tabs * 0.33), 0, 0, 2)
+local function CreateTab(name, displayName)
+    local tabButton = Instance.new("TextButton")
+    tabButton.Size = UDim2.new(0.33, -2, 1, 0)
+    tabButton.Position = UDim2.new((#tabs * 0.33), 0, 0, 0)
+    tabButton.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+    tabButton.BorderSizePixel = 0
+    tabButton.Text = displayName
+    tabButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+    tabButton.Font = Enum.Font.Gotham
+    tabButton.TextSize = 11
     tabButton.Parent = TabButtonsFrame
     
     local tabFrame = Instance.new("ScrollingFrame")
@@ -170,7 +116,7 @@ function CreateTab(name, displayName)
     tabFrame.Position = UDim2.new(0, 0, 0, 0)
     tabFrame.BackgroundTransparency = 1
     tabFrame.BorderSizePixel = 0
-    tabFrame.ScrollBarThickness = 4
+    tabFrame.ScrollBarThickness = 3
     tabFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 255)
     tabFrame.Visible = false
     tabFrame.Parent = TabsContainer
@@ -178,30 +124,26 @@ function CreateTab(name, displayName)
     tabs[name] = {button = tabButton, frame = tabFrame}
     
     tabButton.MouseButton1Click:Connect(function()
-        SwitchTab(name)
+        for tabName, tab in pairs(tabs) do
+            tab.frame.Visible = (tabName == name)
+            if tabName == name then
+                tab.button.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
+            else
+                tab.button.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+            end
+        end
+        currentTab = name
     end)
     
     return tabFrame
 end
 
-function SwitchTab(tabName)
-    for name, tab in pairs(tabs) do
-        tab.frame.Visible = (name == tabName)
-        if name == tabName then
-            tab.button.BackgroundColor3 = Color3.fromRGB(0, 100, 150)
-        else
-            tab.button.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-        end
-    end
-    currentTab = tabName
-end
-
 -- Criar abas
-local optimizationTab = CreateTab("optimization", "OPTIMIZATION")
+local optimizationTab = CreateTab("optimization", "OPTIMIZE")
+local fpsTab = CreateTab("fps", "FPS CONTROL")
 local hacksTab = CreateTab("hacks", "HACKS")
-local configTab = CreateTab("config", "CONFIG")
 
--- Funções de FPS Boost (100% funcionais)
+-- Funções de Otimização (15 métodos)
 local function RemoveCharacterAnimations()
     if localPlayer.Character then
         local humanoid = localPlayer.Character:FindFirstChildOfClass("Humanoid")
@@ -218,43 +160,25 @@ end
 
 local function OptimizeLighting()
     Lighting.GlobalShadows = false
-    Lighting.FogEnd = 100
-    Lighting.Brightness = 2
+    Lighting.FogEnd = 50
+    Lighting.Brightness = 1.5
     Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
-    Lighting.ClockTime = 14
+    Lighting.ClockTime = 12
     
     for _, effect in pairs(Lighting:GetChildren()) do
-        if effect:IsA("PostEffect") or effect:IsA("BloomEffect") or effect:IsA("BlurEffect") then
+        if effect:IsA("PostEffect") then
             effect.Enabled = false
         end
     end
 end
 
 local function RemoveAllSkins()
-    -- Remove skin do jogador local
-    if localPlayer.Character then
-        for _, part in pairs(localPlayer.Character:GetDescendants()) do
-            if part:IsA("Part") or part:IsA("MeshPart") then
-                part.BrickColor = BrickColor.new("Really black")
-                if part:FindFirstChildOfClass("SpecialMesh") then
-                    part:FindFirstChildOfClass("SpecialMesh"):Destroy()
-                end
-                if part:IsA("Shirt") or part:IsA("Pants") or part:IsA("ShirtGraphic") then
-                    part:Destroy()
-                end
-            end
-        end
-    end
-    
-    -- Remove skin de outros jogadores
     for _, player in pairs(Players:GetPlayers()) do
-        if player ~= localPlayer and player.Character then
+        if player.Character then
             for _, part in pairs(player.Character:GetDescendants()) do
                 if part:IsA("Part") or part:IsA("MeshPart") then
                     part.BrickColor = BrickColor.new("Really black")
-                    if part:FindFirstChildOfClass("SpecialMesh") then
-                        part:FindFirstChildOfClass("SpecialMesh"):Destroy()
-                    end
+                    part.Material = Enum.Material.Plastic
                 end
             end
         end
@@ -264,58 +188,118 @@ end
 local function ReduceRenderDistance()
     local camera = Workspace.CurrentCamera
     if camera then
-        camera.FieldOfView = 70
+        camera.FieldOfView = 60
     end
     
     Workspace.DescendantAdded:Connect(function(descendant)
         if descendant:IsA("Part") then
             descendant.Material = Enum.Material.Plastic
-        elseif descendant:IsA("ParticleEmitter") then
-            descendant.Enabled = false
-        elseif descendant:IsA("Decal") then
-            descendant.Transparency = 1
         end
     end)
 end
 
-local function OptimizeGraphics()
-    settings().Rendering.QualityLevel = 1
-    settings().Rendering.MeshCacheSize = 0
-    settings().Rendering.TextureCacheSize = 0
-end
-
-local function DisablePhysics()
-    settings().Physics.PhysicsEnvironmentalThrottle = 2
-    settings().Physics.ThrottleAdjustTime = 10
-end
-
 local function RemoveParticles()
-    for _, particle in pairs(Workspace:GetDescendants()) do
-        if particle:IsA("ParticleEmitter") or particle:IsA("Trail") or particle:IsA("Beam") then
-            particle.Enabled = false
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") then
+            obj.Enabled = false
         end
     end
 end
 
-local function ReduceTextureQuality()
+local function RemoveTextures()
     for _, texture in pairs(Workspace:GetDescendants()) do
-        if texture:IsA("Texture") or texture:IsA("Decal") then
+        if texture:IsA("Decal") then
+            texture.Transparency = 1
+        elseif texture:IsA("Texture") then
             texture.Texture = ""
         end
     end
 end
 
+local function OptimizeGraphics()
+    settings().Rendering.QualityLevel = 1
+    settings().Rendering.MeshCacheSize = 0
+    runSpawn(function()
+        while true do
+            settings().Rendering.EnableFRM = false
+            wait(5)
+        end
+    end)
+end
+
+local function DisablePhysics()
+    settings().Physics.PhysicsEnvironmentalThrottle = 2
+    settings().Physics.ThrottleAdjustTime = 15
+end
+
+local function RemoveSounds()
+    for _, sound in pairs(Workspace:GetDescendants()) do
+        if sound:IsA("Sound") then
+            sound.Volume = 0
+        end
+    end
+end
+
+local function SimplifyTerrain()
+    if Workspace:FindFirstChildOfClass("Terrain") then
+        local terrain = Workspace:FindFirstChildOfClass("Terrain")
+        terrain.Decoration = false
+        terrain.WaterReflectance = 0
+        terrain.WaterTransparency = 1
+    end
+end
+
+local function RemoveGUIEffects()
+    for _, gui in pairs(playerGui:GetDescendants()) do
+        if gui:IsA("UIStroke") or gui:IsA("UIGradient") then
+            gui.Enabled = false
+        end
+    end
+end
+
+local function LimitPartCount()
+    Workspace.DescendantAdded:Connect(function(descendant)
+        if descendant:IsA("Part") then
+            wait(0.1)
+            if descendant.Parent ~= localPlayer.Character then
+                descendant.Transparency = 0.5
+            end
+        end
+    end)
+end
+
+local function OptimizeNetwork()
+    settings().Network.IncomingReplicationLag = 0.5
+end
+
+local function ReduceShadowMap()
+    Lighting.ShadowSoftness = 0
+    Lighting.ShadowColor = Color3.new(1, 1, 1)
+end
+
 local function EnableAggressiveGC()
-    collectgarbage("setpause", 100)
-    collectgarbage("setstepmul", 200)
-    spawn(function()
-        while wait(10) do
+    runSpawn(function()
+        while true do
+            wait(10)
             collectgarbage("collect")
         end
     end)
 end
 
--- Funções de Hack
+-- Controle de FPS
+local function SetTargetFPS(fps)
+    targetFPS = fps
+    runSpawn(function()
+        while true do
+            local currentFPS = 1/RunService.RenderStepped:Wait()
+            if currentFPS > targetFPS then
+                wait(1/targetFPS)
+            end
+        end
+    end)
+end
+
+-- Infinite Jump melhorado para celular
 local function ToggleInfiniteJump(state)
     infiniteJumpEnabled = state
     if state then
@@ -335,35 +319,30 @@ local function ToggleInfiniteJump(state)
     end
 end
 
--- Sistema de mostrar FPS
+-- Show FPS
 local function ToggleShowFPS(state)
     showFpsEnabled = state
     if state then
-        if not fpsLabel then
-            fpsLabel = Instance.new("TextLabel")
-            fpsLabel.Name = "FPSDisplay"
-            fpsLabel.Size = UDim2.new(0, 80, 0, 30)
-            fpsLabel.Position = UDim2.new(0, 10, 0, 50)
-            fpsLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-            fpsLabel.BackgroundTransparency = 0.5
-            fpsLabel.BorderSizePixel = 0
-            fpsLabel.Text = "FPS: 0"
-            fpsLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-            fpsLabel.Font = Enum.Font.GothamBold
-            fpsLabel.TextSize = 14
-            fpsLabel.Parent = ScreenGui
-            
-            -- Atualizar FPS em tempo real
-            connections.fpsUpdate = RunService.RenderStepped:Connect(function()
-                if fpsLabel then
-                    fpsLabel.Text = "FPS: " .. math.floor(1/RunService.RenderStepped:Wait())
-                end
-            end)
-        end
-        fpsLabel.Visible = true
+        fpsLabel = Instance.new("TextLabel")
+        fpsLabel.Size = UDim2.new(0, 70, 0, 20)
+        fpsLabel.Position = UDim2.new(0, 10, 0, 10)
+        fpsLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        fpsLabel.BackgroundTransparency = 0.7
+        fpsLabel.Text = "FPS: 0"
+        fpsLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+        fpsLabel.Font = Enum.Font.GothamBold
+        fpsLabel.TextSize = 12
+        fpsLabel.Parent = ScreenGui
+        
+        connections.fpsUpdate = RunService.RenderStepped:Connect(function()
+            if fpsLabel then
+                fpsLabel.Text = "FPS: " .. math.floor(1/RunService.RenderStepped:Wait())
+            end
+        end)
     else
         if fpsLabel then
-            fpsLabel.Visible = false
+            fpsLabel:Destroy()
+            fpsLabel = nil
         end
         if connections.fpsUpdate then
             connections.fpsUpdate:Disconnect()
@@ -372,51 +351,44 @@ local function ToggleShowFPS(state)
     end
 end
 
--- Sistema de toggle switches melhorado
-function CreateCyberToggle(name, description, tab, configKey, callback)
+-- Sistema de Toggles Cyberpunk
+function CreateCyberToggle(name, description, tab, defaultState, callback)
     local ToggleFrame = Instance.new("Frame")
-    ToggleFrame.Name = name .. "Toggle"
-    ToggleFrame.Size = UDim2.new(1, 0, 0, 50)
+    ToggleFrame.Size = UDim2.new(1, 0, 0, 40)
     ToggleFrame.BackgroundTransparency = 1
     ToggleFrame.BorderSizePixel = 0
     
     local ToggleLabel = Instance.new("TextLabel")
-    ToggleLabel.Name = "Label"
     ToggleLabel.Size = UDim2.new(0.7, 0, 0.6, 0)
     ToggleLabel.Position = UDim2.new(0, 0, 0, 0)
     ToggleLabel.BackgroundTransparency = 1
     ToggleLabel.Text = "🔧 " .. name
     ToggleLabel.TextColor3 = Color3.fromRGB(0, 255, 255)
     ToggleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    ToggleLabel.Font = Enum.Font.GothamBold
-    ToggleLabel.TextSize = 12
+    ToggleLabel.Font = Enum.Font.Gotham
+    ToggleLabel.TextSize = 11
     
     local DescriptionLabel = Instance.new("TextLabel")
-    DescriptionLabel.Name = "Description"
     DescriptionLabel.Size = UDim2.new(0.7, 0, 0.4, 0)
     DescriptionLabel.Position = UDim2.new(0, 0, 0.6, 0)
     DescriptionLabel.BackgroundTransparency = 1
     DescriptionLabel.Text = description
-    DescriptionLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
+    DescriptionLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
     DescriptionLabel.TextXAlignment = Enum.TextXAlignment.Left
     DescriptionLabel.Font = Enum.Font.Gotham
-    DescriptionLabel.TextSize = 10
-    
-    local defaultState = savedSettings[configKey] or false
+    DescriptionLabel.TextSize = 9
     
     local ToggleButton = Instance.new("TextButton")
-    ToggleButton.Name = "Toggle"
-    ToggleButton.Size = UDim2.new(0, 50, 0, 25)
-    ToggleButton.Position = UDim2.new(1, -55, 0.5, -12)
-    ToggleButton.BackgroundColor3 = defaultState and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(80, 80, 80)
+    ToggleButton.Size = UDim2.new(0, 35, 0, 18)
+    ToggleButton.Position = UDim2.new(1, -40, 0.5, -9)
+    ToggleButton.BackgroundColor3 = defaultState and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(60, 60, 80)
     ToggleButton.BorderSizePixel = 0
     ToggleButton.Text = ""
     ToggleButton.AutoButtonColor = false
     
     local ToggleKnob = Instance.new("Frame")
-    ToggleKnob.Name = "Knob"
-    ToggleKnob.Size = UDim2.new(0, 21, 0, 21)
-    ToggleKnob.Position = defaultState and UDim2.new(1, -23, 0.5, -10) or UDim2.new(0, 2, 0.5, -10)
+    ToggleKnob.Size = UDim2.new(0, 14, 0, 14)
+    ToggleKnob.Position = defaultState and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
     ToggleKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     ToggleKnob.BorderSizePixel = 0
     
@@ -427,24 +399,15 @@ function CreateCyberToggle(name, description, tab, configKey, callback)
     
     local isEnabled = defaultState
     
-    -- Aplicar estado inicial
-    if isEnabled then
-        callback(true)
-    end
-    
     ToggleButton.MouseButton1Click:Connect(function()
         isEnabled = not isEnabled
-        savedSettings[configKey] = isEnabled
-        SaveSettings()
-        
         if isEnabled then
-            ToggleButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-            ToggleKnob:TweenPosition(UDim2.new(1, -23, 0.5, -10), "Out", "Quad", 0.2)
+            ToggleButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+            ToggleKnob.Position = UDim2.new(1, -16, 0.5, -7)
         else
-            ToggleButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-            ToggleKnob:TweenPosition(UDim2.new(0, 2, 0.5, -10), "Out", "Quad", 0.2)
+            ToggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+            ToggleKnob.Position = UDim2.new(0, 2, 0.5, -7)
         end
-        
         callback(isEnabled)
     end)
     
@@ -452,70 +415,80 @@ function CreateCyberToggle(name, description, tab, configKey, callback)
     return ToggleFrame
 end
 
--- Criar toggles de otimização
-local optimizationToggles = {
-    {name = "Remover Animações", desc = "Para movimentos de braços/pernas", key = "removeAnim", func = RemoveCharacterAnimations},
-    {name = "Otimizar Iluminação", desc = "Remove sombras e efeitos de luz", key = "optimizeLight", func = OptimizeLighting},
-    {name = "Remover Todas as Skins", desc = "Deixa todos os players pretos", key = "removeSkins", func = RemoveAllSkins},
-    {name = "Reduzir Renderização", desc = "Diminui distância de renderização", key = "reduceRender", func = ReduceRenderDistance},
-    {name = "Física Leve", desc = "Reduz qualidade da física", key = "lightPhysics", func = DisablePhysics},
-    {name = "Remover Partículas", desc = "Desativa todos os efeitos visuais", key = "removeParticles", func = RemoveParticles},
-    {name = "Texturas Baixas", desc = "Remove todas as texturas", key = "lowTextures", func = ReduceTextureQuality},
-    {name = "GC Agressivo", desc = "Coleta de lixo frequente", key = "aggressiveGC", func = EnableAggressiveGC},
-    {name = "Otimizar Gráficos", desc = "Configurações gráficas mínimas", key = "optimizeGraphics", func = OptimizeGraphics},
-    {name = "Mostrar FPS", desc = "Mostra FPS em tempo real", key = "showFPS", func = ToggleShowFPS}
-}
-
--- Criar toggles de hacks
-local hackToggles = {
-    {name = "Infinite Jump", desc = "Pulo infinito (flutuação)", key = "infiniteJump", func = ToggleInfiniteJump}
-}
-
--- Adicionar toggles às abas
-for i, toggle in ipairs(optimizationToggles) do
-    CreateCyberToggle(toggle.name, toggle.desc, optimizationTab, toggle.key, toggle.func)
-end
-
-for i, toggle in ipairs(hackToggles) do
-    CreateCyberToggle(toggle.name, toggle.desc, hacksTab, toggle.key, toggle.func)
-end
-
--- Configurações adicionais na aba config
-local function CreateConfigButton(name, callback)
-    local button = CreateCyberButton(name, Color3.fromRGB(255, 255, 0))
-    button.Size = UDim2.new(1, 0, 0, 35)
-    button.Position = UDim2.new(0, 0, 0, #configTab:GetChildren() * 40)
-    button.Parent = configTab
-    button.MouseButton1Click = callback
+-- Botões de FPS
+function CreateFPSButton(fpsValue, tab)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, 0, 0, 30)
+    button.Position = UDim2.new(0, 0, 0, #tab:GetChildren() * 35)
+    button.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    button.BorderSizePixel = 0
+    button.Text = "🎯 " .. fpsValue .. " FPS"
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Font = Enum.Font.Gotham
+    button.TextSize = 12
+    button.Parent = tab
+    
+    button.MouseButton1Click:Connect(function()
+        SetTargetFPS(fpsValue)
+        for _, child in pairs(tab:GetChildren()) do
+            if child:IsA("TextButton") then
+                child.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+            end
+        end
+        button.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
+    end)
+    
     return button
 end
 
-CreateConfigButton("💾 Salvar Configurações Atuais", function()
-    SaveSettings()
-    print("✅ Configurações salvas!")
-end)
+-- Adicionar otimizações
+local optimizationToggles = {
+    {name = "Sem Animacoes", desc = "Remove movimentos", func = RemoveCharacterAnimations},
+    {name = "Luz Otimizada", desc = "Iluminacao minima", func = OptimizeLighting},
+    {name = "Skins Pretas", desc = "Todos players pretos", func = RemoveAllSkins},
+    {name = "Render Reduzido", desc = "Menos detalhes", func = ReduceRenderDistance},
+    {name = "Sem Particulas", desc = "Remove efeitos visuais", func = RemoveParticles},
+    {name = "Sem Texturas", desc = "Remove todas texturas", func = RemoveTextures},
+    {name = "Graficos Minimos", desc = "Qualidade minima", func = OptimizeGraphics},
+    {name = "Fisica Leve", desc = "Fisica otimizada", func = DisablePhysics},
+    {name = "Sem Sons", desc = "Remove sons ambientais", func = RemoveSounds},
+    {name = "Terreno Simples", desc = "Terreno otimizado", func = SimplifyTerrain},
+    {name = "Sem Efeitos GUI", desc = "Interface limpa", func = RemoveGUIEffects},
+    {name = "Limitar Partes", desc = "Menos objetos", func = LimitPartCount},
+    {name = "Rede Otimizada", desc = "Conexao melhor", func = OptimizeNetwork},
+    {name = "Sombras Reduzidas", desc = "Sombras minimas", func = ReduceShadowMap},
+    {name = "GC Agressivo", desc = "Limpeza de memoria", func = EnableAggressiveGC}
+}
 
-CreateConfigButton("🔄 Aplicar Todas Otimizações", function()
-    for _, toggle in ipairs(optimizationToggles) do
-        if savedSettings[toggle.key] then
-            toggle.func(true)
-        end
-    end
-    print("✅ Todas otimizações aplicadas!")
-end)
+-- Adicionar toggles de hacks
+local hackToggles = {
+    {name = "Pulo Infinito", desc = "Segure para flutuar", func = ToggleInfiniteJump},
+    {name = "Mostrar FPS", desc = "FPS em tempo real", func = ToggleShowFPS}
+}
 
-CreateConfigButton("🗑️ Limpar Configurações", function()
-    savedSettings = {}
-    SaveSettings()
-    print("✅ Configurações limpas! Recarregue o script.")
-end)
+-- Adicionar elementos às abas
+for i, toggle in ipairs(optimizationToggles) do
+    local toggleFrame = CreateCyberToggle(toggle.name, toggle.desc, optimizationTab, false, toggle.func)
+    toggleFrame.Position = UDim2.new(0, 0, 0, (i-1) * 45)
+end
 
--- Ajustar tamanho do canvas
-optimizationTab.CanvasSize = UDim2.new(0, 0, 0, #optimizationToggles * 55)
-hacksTab.CanvasSize = UDim2.new(0, 0, 0, #hackToggles * 55)
-configTab.CanvasSize = UDim2.new(0, 0, 0, 150)
+for i, toggle in ipairs(hackToggles) do
+    local toggleFrame = CreateCyberToggle(toggle.name, toggle.desc, hacksTab, false, toggle.func)
+    toggleFrame.Position = UDim2.new(0, 0, 0, (i-1) * 45)
+end
 
--- Adicionar elementos à GUI
+-- Adicionar botões de FPS
+local fpsValues = {30, 60, 90, 120}
+for i, fps in ipairs(fpsValues) do
+    CreateFPSButton(fps, fpsTab)
+end
+
+-- Ajustar tamanho dos containers
+optimizationTab.CanvasSize = UDim2.new(0, 0, 0, #optimizationToggles * 45)
+hacksTab.CanvasSize = UDim2.new(0, 0, 0, #hackToggles * 45)
+fpsTab.CanvasSize = UDim2.new(0, 0, 0, #fpsValues * 35)
+
+-- Montar GUI
 Header.Parent = MainFrame
 Title.Parent = Header
 MinimizeButton.Parent = Header
@@ -525,65 +498,49 @@ TabsContainer.Parent = MainFrame
 MainFrame.Parent = ScreenGui
 ScreenGui.Parent = playerGui
 
--- Efeitos visuais cyberpunk
-spawn(function()
-    while wait(0.1) do
-        UIStroke.Color = Color3.fromHSV(tick() % 5 / 5, 1, 1)
+-- Efeitos cyberpunk
+runSpawn(function()
+    while true do
+        wait(0.1)
+        UIStroke.Color = Color3.fromHSV(tick() % 3 / 3, 1, 1)
     end
 end)
 
--- Funções dos botões header
+-- Funções dos botões
 local isMinimized = false
-local originalSize = MainFrame.Size
 
 MinimizeButton.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
     if isMinimized then
-        MainFrame.Size = originalSize
-        TabsContainer.Visible = true
-        TabButtonsFrame.Visible = true
-        isMinimized = false
-    else
-        originalSize = MainFrame.Size
-        MainFrame.Size = UDim2.new(0, 350, 0, 40)
-        TabsContainer.Visible = false
+        MainFrame.Size = UDim2.new(0, 320, 0, 35)
         TabButtonsFrame.Visible = false
-        isMinimized = true
+        TabsContainer.Visible = false
+    else
+        MainFrame.Size = UDim2.new(0, 320, 0, 400)
+        TabButtonsFrame.Visible = true
+        TabsContainer.Visible = true
     end
 end)
 
 CloseButton.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
-    -- Desconectar todas as conexões
-    for _, connection in pairs(connections) do
-        connection:Disconnect()
-    end
-end)
-
--- Inicializar na aba optimization
-SwitchTab("optimization")
-
--- Aplicar configurações salvas automaticamente
-spawn(function()
-    wait(1)
-    for _, toggle in ipairs(optimizationToggles) do
-        if savedSettings[toggle.key] then
-            toggle.func(true)
-        end
-    end
-    for _, toggle in ipairs(hackToggles) do
-        if savedSettings[toggle.key] then
-            toggle.func(true)
+    for _, conn in pairs(connections) do
+        if conn then
+            conn:Disconnect()
         end
     end
 end)
+
+-- Inicializar na primeira aba
+for tabName, tab in pairs(tabs) do
+    tab.frame.Visible = (tabName == "optimization")
+    if tabName == "optimization" then
+        tab.button.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
+    end
+end
 
 -- Conectar eventos de character
 localPlayer.CharacterAdded:Connect(function(character)
-    wait(2)
-    if savedSettings["removeAnim"] then
-        RemoveCharacterAnimations()
-    end
-    if savedSettings["removeSkins"] then
-        RemoveAllSkins()
-    end
+    wait(1)
+    -- Reaplicar otimizações se necessário
 end)
