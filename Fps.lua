@@ -389,6 +389,3 @@ localPlayer.CharacterAdded:Connect(function(character)
     RemoveCharacterAnimations()
     RemovePlayerSkin()
 end)
-
-print("vgzinsk V1 - FPS Boost carregado com sucesso!")
-print("Painel arrastável ativo - Use para controlar as otimizações")
