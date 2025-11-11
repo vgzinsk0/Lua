@@ -1,8 +1,8 @@
 --[[
     ╔═══════════════════════════════════════════════════════════╗
-    ║           VGZINSK V2 - MOBILE EDITION                     ║
-    ║           Steal a Brainrot Hack Script                    ║
+    ║           VGZINSK V3 - MOBILE EDITION                     ║
     ║           Optimized for Touch-Screen                      ║
+    ║           35x FPS Boost Functions                         ║
     ╚═══════════════════════════════════════════════════════════╝
 ]]
 
@@ -26,20 +26,13 @@ local camera = Workspace.CurrentCamera
 local scriptState = {
     -- ESP States
     espPlayers = false,
-    rainbowBase = false,
-    xray = false,
-    timerESP = false,
-    espLines = false,
     
     -- Main States
     platformBuilder = false,
-    autoSteal = false,
-    wallhack = false,
-    antiAFK = false,
-    freeze = false,
-    expelBanned = false,
+    speedBoost = false,
+    speedValue = 16, -- Default WalkSpeed
     
-    -- FPS States (25 optimization functions)
+    -- FPS States (35 optimization functions)
     removeTextures = false,
     removeParticles = false,
     disableShadows = false,
@@ -65,18 +58,26 @@ local scriptState = {
     disableDepthOfField = false,
     optimizeAnimations = false,
     reduceShadowQuality = false,
-    disableMotionBlur = false
+    disableMotionBlur = false,
+    -- 10 New Functions
+    disableFog = false,
+    removeTerrainDetails = false,
+    disableCollisionFiltering = false,
+    reduceRenderDistance = false,
+    disableWaterReflections = false,
+    removePostEffectInstances = false,
+    optimizeSounds = false,
+    disableHumanoidStates = false,
+    reducePartCount = false,
+    disableStreaming = false
 }
 
 -- CONNECTIONS
 local connections = {}
 
 -- DATA STORAGE
-local setPoint = nil
-local previousPosition = nil
 local platformParts = {}
 local espObjects = {}
-local wallhackOriginalStates = {}
 
 -- GUI VARIABLES
 local mainGui = nil
@@ -100,44 +101,13 @@ local function CreateTween(object, properties, duration, style, direction)
     return tween
 end
 
-local function IsGroundPart(part)
-    if not localPlayer.Character then return false end
-    local rootPart = localPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return false end
-    
-    local playerPos = rootPart.Position
-    local partPos = part.Position
-    
-    -- Verifica se está abaixo do jogador (chão)
-    if partPos.Y < playerPos.Y - 2 then
-        -- Verifica se está próximo horizontalmente
-        local horizontalDistance = math.sqrt((partPos.X - playerPos.X)^2 + (partPos.Z - playerPos.Z)^2)
-        if horizontalDistance < 15 then
-            return true
-        end
-    end
-    
-    -- Verifica nomes comuns de chão
-    local name = part.Name:lower()
-    if name:find("floor") or name:find("ground") or name:find("base") or name:find("terrain") then
-        return true
-    end
-    
-    -- Verifica partes muito baixas e largas (geralmente chão)
-    if part.Position.Y < 10 and part.Size.Y < 3 and (part.Size.X > 20 or part.Size.Z > 20) then
-        return true
-    end
-    
-    return false
-end
-
 --[[
     ═══════════════════════════════════════════════════════════
                         ESP FUNCTIONS
     ═══════════════════════════════════════════════════════════
 ]]
 
--- ESP PLAYERS
+-- ESP PLAYERS (MANTIDO)
 local function ToggleESPPlayers(state)
     scriptState.espPlayers = state
     
@@ -196,181 +166,17 @@ local function ToggleESPPlayers(state)
     end
 end
 
--- RAINBOW BASE HIGHLIGHT
-local function ToggleRainbowBase(state)
-    scriptState.rainbowBase = state
-    
-    if state then
-        -- Procurar pela base do jogador
-        local function FindPlayerBase()
-            for _, obj in pairs(Workspace:GetDescendants()) do
-                if obj:IsA("Model") and obj.Name:lower():find("base") then
-                    -- Verificar se é a base do jogador (próxima ao spawn)
-                    local highlight = Instance.new("Highlight")
-                    highlight.Name = "VGZINSK_RainbowBase"
-                    highlight.FillTransparency = 0.7
-                    highlight.OutlineTransparency = 0
-                    highlight.Parent = obj
-                    
-                    table.insert(espObjects, highlight)
-                    
-                    -- Efeito rainbow
-                    connections.rainbowBase = RunService.Heartbeat:Connect(function()
-                        if scriptState.rainbowBase and highlight and highlight.Parent then
-                            local hue = tick() % 5 / 5
-                            highlight.FillColor = Color3.fromHSV(hue, 1, 1)
-                            highlight.OutlineColor = Color3.fromHSV(hue, 1, 1)
-                        end
-                    end)
-                end
-            end
-        end
-        
-        FindPlayerBase()
-    else
-        if connections.rainbowBase then
-            connections.rainbowBase:Disconnect()
-        end
-        
-        for _, obj in pairs(Workspace:GetDescendants()) do
-            if obj.Name == "VGZINSK_RainbowBase" then
-                obj:Destroy()
-            end
-        end
-    end
-end
-
--- X-RAY
-local function ToggleXRay(state)
-    scriptState.xray = state
-    
-    if state then
-        for _, obj in pairs(Workspace:GetDescendants()) do
-            if obj:IsA("BasePart") and obj.Name:lower():find("wall") or obj.Name:lower():find("door") then
-                obj.Transparency = 0.8
-                obj.CanCollide = false
-            end
-        end
-    else
-        for _, obj in pairs(Workspace:GetDescendants()) do
-            if obj:IsA("BasePart") then
-                obj.Transparency = 0
-                obj.CanCollide = true
-            end
-        end
-    end
-end
-
--- TIMER ESP
-local function ToggleTimerESP(state)
-    scriptState.timerESP = state
-    
-    if state then
-        -- Procurar bases inimigas e adicionar timer
-        for _, obj in pairs(Workspace:GetDescendants()) do
-            if obj:IsA("BillboardGui") and obj.Name:lower():find("timer") then
-                obj.Enabled = true
-                obj.AlwaysOnTop = true
-            end
-        end
-    else
-        for _, obj in pairs(Workspace:GetDescendants()) do
-            if obj:IsA("BillboardGui") and obj.Name:lower():find("timer") then
-                obj.AlwaysOnTop = false
-            end
-        end
-    end
-end
-
--- ESP LINES
-local function ToggleESPLines(state)
-    scriptState.espLines = state
-    
-    if state then
-        -- Criar linha verde para base do jogador
-        local greenLine = Drawing.new("Line")
-        greenLine.Visible = true
-        greenLine.Color = Color3.fromRGB(0, 255, 0)
-        greenLine.Thickness = 3
-        greenLine.Transparency = 1
-        
-        -- Criar linha vermelha para brainrot mais caro
-        local redLine = Drawing.new("Line")
-        redLine.Visible = true
-        redLine.Color = Color3.fromRGB(255, 0, 0)
-        redLine.Thickness = 3
-        redLine.Transparency = 1
-        
-        connections.espLines = RunService.RenderStepped:Connect(function()
-            if scriptState.espLines and localPlayer.Character then
-                local rootPart = localPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if rootPart then
-                    local screenCenter = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
-                    
-                    -- Linha verde para base
-                    local playerBase = Workspace:FindFirstChild("YourBase") -- Ajustar nome
-                    if playerBase then
-                        local basePos, onScreen = camera:WorldToViewportPoint(playerBase.Position)
-                        if onScreen then
-                            greenLine.From = screenCenter
-                            greenLine.To = Vector2.new(basePos.X, basePos.Y)
-                        end
-                    end
-                    
-                    -- Linha vermelha para brainrot mais caro
-                    local mostExpensiveBrainrot = nil
-                    local highestValue = 0
-                    
-                    for _, obj in pairs(Workspace:GetDescendants()) do
-                        if obj.Name:lower():find("brainrot") and obj:IsA("Model") then
-                            -- Procurar valor do brainrot
-                            local valueObj = obj:FindFirstChild("Value")
-                            if valueObj and valueObj.Value > highestValue then
-                                highestValue = valueObj.Value
-                                mostExpensiveBrainrot = obj
-                            end
-                        end
-                    end
-                    
-                    if mostExpensiveBrainrot then
-                        local brainrotPos, onScreen = camera:WorldToViewportPoint(mostExpensiveBrainrot:GetPivot().Position)
-                        if onScreen then
-                            redLine.From = screenCenter
-                            redLine.To = Vector2.new(brainrotPos.X, brainrotPos.Y)
-                        end
-                    end
-                end
-            end
-        end)
-        
-        table.insert(espObjects, greenLine)
-        table.insert(espObjects, redLine)
-    else
-        if connections.espLines then
-            connections.espLines:Disconnect()
-        end
-        
-        for _, obj in pairs(espObjects) do
-            if typeof(obj) == "table" and obj.Remove then
-                obj:Remove()
-            end
-        end
-    end
-end
-
 --[[
     ═══════════════════════════════════════════════════════════
                         MAIN FUNCTIONS
     ═══════════════════════════════════════════════════════════
 ]]
 
--- PLATFORM BUILDER
+-- PLATFORM BUILDER (MANTIDO)
 local function TogglePlatformBuilder(state)
     scriptState.platformBuilder = state
     
     if state then
-        local lastPlatformTime = {}
-        
         local function CreatePlatform(position)
             local platform = Instance.new("Part")
             platform.Name = "VGZINSK_Platform"
@@ -384,7 +190,6 @@ local function TogglePlatformBuilder(state)
             platform.Parent = Workspace
             
             table.insert(platformParts, platform)
-            lastPlatformTime[platform] = tick()
             
             -- Remover após 3 segundos
             task.delay(3, function()
@@ -422,243 +227,42 @@ local function TogglePlatformBuilder(state)
     end
 end
 
--- AUTO STEAL
-local autoStealEnabled = false
-local autoStealSetPoint = nil
+-- SPEED BOOST (NOVO)
+local originalWalkSpeed = 16
 
-local function ToggleAutoSteal(state)
-    scriptState.autoSteal = state
-    autoStealEnabled = state
+local function ToggleSpeedBoost(state)
+    scriptState.speedBoost = state
     
-    if state then
-        connections.autoSteal = RunService.Heartbeat:Connect(function()
-            if not autoStealEnabled or not localPlayer.Character then return end
-            
-            local rootPart = localPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if not rootPart then return end
-            
-            -- Procurar brainrot próximo
-            for _, obj in pairs(Workspace:GetDescendants()) do
-                if obj.Name:lower():find("brainrot") and obj:IsA("Model") then
-                    local distance = (obj:GetPivot().Position - rootPart.Position).Magnitude
-                    
-                    if distance < 10 then
-                        -- Simular segurar botão de roubo
-                        local stealButton = playerGui:FindFirstChild("StealButton", true)
-                        if stealButton then
-                            -- Ativar roubo
-                            task.wait(2) -- Tempo de segurar
-                            
-                            -- Teleportar de volta para set point
-                            if autoStealSetPoint then
-                                -- Fazer personagem flutuar
-                                local bodyVelocity = Instance.new("BodyVelocity")
-                                bodyVelocity.Velocity = Vector3.new(0, 50, 0)
-                                bodyVelocity.MaxForce = Vector3.new(0, math.huge, 0)
-                                bodyVelocity.Parent = rootPart
-                                
-                                task.wait(0.5)
-                                
-                                -- Teleportar
-                                rootPart.CFrame = CFrame.new(autoStealSetPoint)
-                                
-                                bodyVelocity:Destroy()
-                            end
-                        end
-                    end
-                end
-            end
-        end)
-    else
-        if connections.autoSteal then
-            connections.autoSteal:Disconnect()
-        end
-    end
-end
-
-local function SetAutoStealPoint()
     if localPlayer.Character then
-        local rootPart = localPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if rootPart then
-            autoStealSetPoint = rootPart.Position
-            return true
-        end
-    end
-    return false
-end
-
--- WALLHACK (CORRIGIDO)
-local function ToggleWallhack(state)
-    scriptState.wallhack = state
-    
-    if state then
-        for _, obj in pairs(Workspace:GetDescendants()) do
-            if obj:IsA("BasePart") and not IsGroundPart(obj) then
-                -- Salvar estado original
-                if not wallhackOriginalStates[obj] then
-                    wallhackOriginalStates[obj] = {
-                        CanCollide = obj.CanCollide,
-                        Transparency = obj.Transparency
-                    }
-                end
-                
-                -- Remover colisão e aumentar transparência
-                obj.CanCollide = false
-                obj.Transparency = 0.7
-            end
-        end
-        
-        -- Monitorar novos objetos
-        connections.wallhack = Workspace.DescendantAdded:Connect(function(obj)
-            if scriptState.wallhack and obj:IsA("BasePart") and not IsGroundPart(obj) then
-                wallhackOriginalStates[obj] = {
-                    CanCollide = obj.CanCollide,
-                    Transparency = obj.Transparency
-                }
-                obj.CanCollide = false
-                obj.Transparency = 0.7
-            end
-        end)
-    else
-        if connections.wallhack then
-            connections.wallhack:Disconnect()
-        end
-        
-        -- Restaurar estados originais
-        for obj, state in pairs(wallhackOriginalStates) do
-            if obj and obj.Parent then
-                obj.CanCollide = state.CanCollide
-                obj.Transparency = state.Transparency
-            end
-        end
-        wallhackOriginalStates = {}
-    end
-end
-
--- ANTI AFK
-local function ToggleAntiAFK(state)
-    scriptState.antiAFK = state
-    
-    if state then
-        local direction = 1 -- 1 for right, -1 for left
-        connections.antiAFK = RunService.Heartbeat:Connect(function()
-            if not localPlayer.Character then return end
-            local rootPart = localPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if not rootPart then return end
-            
-            -- Alternar direção a cada 2 segundos para simular movimento
-            if tick() % 2 < 1 then
-                direction = 1
+        local humanoid = localPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            if state then
+                humanoid.WalkSpeed = scriptState.speedValue
             else
-                direction = -1
-            end
-            
-            -- Simular movimento lateral (analógico)
-            local humanoid = localPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                local moveVector = rootPart.CFrame.RightVector * direction * 0.1 -- Pequeno movimento lateral
-                humanoid:Move(moveVector)
-            end
-        end)
-    else
-        if connections.antiAFK then
-            connections.antiAFK:Disconnect()
-        end
-        
-        if localPlayer.Character then
-            local humanoid = localPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                humanoid:Move(Vector3.new(0, 0, 0))
+                humanoid.WalkSpeed = originalWalkSpeed
             end
         end
     end
 end
 
--- FREEZE (CONGELAMENTO DE INIMIGO)
-local function ToggleFreeze(state)
-    scriptState.freeze = state
-    
-    if state then
-        connections.freeze = localPlayer.Character.ChildAdded:Connect(function(child)
-            -- Detectar se o jogador equipou o taco (ou ferramenta de ataque)
-            if child:IsA("Tool") and (child.Name:lower():find("stick") or child.Name:lower():find("taco")) then
-                child.Activated:Connect(function()
-                    -- Procurar inimigo próximo
-                    local target = nil
-                    local minDistance = 10
-                    local rootPart = localPlayer.Character:FindFirstChild("HumanoidRootPart")
-                    
-                    if not rootPart then return end
-                    
-                    for _, player in pairs(Players:GetPlayers()) do
-                        if player ~= localPlayer and player.Character then
-                            local enemyRoot = player.Character:FindFirstChild("HumanoidRootPart")
-                            if enemyRoot then
-                                local distance = (enemyRoot.Position - rootPart.Position).Magnitude
-                                if distance < minDistance then
-                                    minDistance = distance
-                                    target = player
-                                end
-                            end
-                        end
-                    end
-                    
-                    if target and target.Character then
-                        -- Tentar congelar o inimigo (Client-Side Block)
-                        local enemyHumanoid = target.Character:FindFirstChildOfClass("Humanoid")
-                        if enemyHumanoid then
-                            enemyHumanoid.WalkSpeed = 0
-                            enemyHumanoid.JumpPower = 0
-                            
-                            -- Adicionar um BodyPosition para tentar fixar a posição
-                            local bodyPos = Instance.new("BodyPosition")
-                            bodyPos.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                            bodyPos.Position = enemyHumanoid.Parent:GetPivot().Position
-                            bodyPos.Parent = enemyHumanoid.Parent:FindFirstChild("HumanoidRootPart")
-                            
-                            -- Remover o congelamento após 5 segundos (para evitar suspeitas)
-                            task.delay(5, function()
-                                if enemyHumanoid and enemyHumanoid.Parent then
-                                    enemyHumanoid.WalkSpeed = 16
-                                    enemyHumanoid.JumpPower = 50
-                                end
-                                if bodyPos and bodyPos.Parent then
-                                    bodyPos:Destroy()
-                                end
-                            end)
-                        end
-                    end
-                end)
-            end
-        end)
-    else
-        if connections.freeze then
-            connections.freeze:Disconnect()
+local function SetSpeedValue(value)
+    scriptState.speedValue = value
+    if scriptState.speedBoost and localPlayer.Character then
+        local humanoid = localPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.WalkSpeed = value
         end
     end
-end
-
--- EXPEL BANNED (KICK FORÇADO)
-local function KickTargetPlayer(targetPlayer)
-    if not targetPlayer then return end
-    
-    -- Tentar forçar o kick (Client-Side Exploit)
-    -- A maneira mais "segura" (client-side) é destruir o Character e causar um erro de replicação.
-    if targetPlayer.Character then
-        targetPlayer.Character:Destroy()
-    end
-    
-    -- Tentativa de causar um erro de script no lado do cliente do alvo (altamente dependente do jogo/executor)
-    -- Não implementaremos código invasivo aqui, apenas a destruição do Character.
 end
 
 --[[
     ═══════════════════════════════════════════════════════════
-                        FPS OPTIMIZATION FUNCTIONS (25)
+                        FPS OPTIMIZATION FUNCTIONS (35)
     ═══════════════════════════════════════════════════════════
 ]]
 
 local optimizationFunctions = {
+    -- 25 Existing (Corrigidas/Revisadas)
     {
         key = "removeTextures",
         name = "Remove Textures",
@@ -706,6 +310,7 @@ local optimizationFunctions = {
             if state then
                 Lighting.Technology = Enum.Technology.Compatibility
             else
+                -- Não podemos restaurar o original, mas podemos usar ShadowMap como padrão
                 Lighting.Technology = Enum.Technology.ShadowMap
             end
         end
@@ -784,6 +389,7 @@ local optimizationFunctions = {
         key = "optimizeNetwork",
         name = "Optimize Network",
         func = function(state)
+            -- Aumentar IncomingReplicationLag pode reduzir o lag, mas pode causar desync
             settings().Network.IncomingReplicationLag = state and 1000 or 0
         end
     },
@@ -935,10 +541,109 @@ local optimizationFunctions = {
                 end
             end
         end
+    },
+    
+    -- 10 New Functions (Total 35)
+    {
+        key = "disableFog",
+        name = "Disable Fog",
+        func = function(state)
+            Lighting.FogEnd = state and 100000 or 0
+            Lighting.FogStart = state and 100000 or 0
+        end
+    },
+    {
+        key = "removeTerrainDetails",
+        name = "Remove Terrain Details",
+        func = function(state)
+            if state then
+                Workspace.Terrain.Decoration = Enum.TerrainDecoration.None
+            else
+                Workspace.Terrain.Decoration = Enum.TerrainDecoration.Smooth
+            end
+        end
+    },
+    {
+        key = "disableCollisionFiltering",
+        name = "Disable Collision Filtering",
+        func = function(state)
+            -- Pode causar problemas, mas é uma otimização de física
+            settings().Physics.AllowSleep = not state
+        end
+    },
+    {
+        key = "reduceRenderDistance",
+        name = "Reduce Render Distance",
+        func = function(state)
+            -- Reduz a distância de renderização (pode ser um exploit)
+            settings().Rendering.RenderDistance = state and 50 or 500
+        end
+    },
+    {
+        key = "disableWaterReflections",
+        name = "Disable Water Reflections",
+        func = function(state)
+            settings().Rendering.Reflections = state and Enum.ReflectionLevel.None or Enum.ReflectionLevel.Low
+        end
+    },
+    {
+        key = "removePostEffectInstances",
+        name = "Remove Post Effect Instances",
+        func = function(state)
+            for _, obj in pairs(Lighting:GetChildren()) do
+                if obj:IsA("PostEffect") then
+                    obj.Enabled = not state
+                end
+            end
+        end
+    },
+    {
+        key = "optimizeSounds",
+        name = "Optimize Sounds",
+        func = function(state)
+            -- Reduz a qualidade do som
+            settings().Audio.QualityLevel = state and Enum.AudioQuality.Low or Enum.AudioQuality.High
+        end
+    },
+    {
+        key = "disableHumanoidStates",
+        name = "Disable Humanoid States",
+        func = function(state)
+            -- Desativa estados como queda, pulo, etc. (pode ser um exploit)
+            if localPlayer.Character then
+                local humanoid = localPlayer.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, not state)
+                    humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, not state)
+                end
+            end
+        end
+    },
+    {
+        key = "reducePartCount",
+        name = "Reduce Part Count",
+        func = function(state)
+            -- Tenta reduzir a contagem de partes (apenas para partes não essenciais)
+            if state then
+                for _, obj in pairs(Workspace:GetDescendants()) do
+                    if obj:IsA("Part") and obj.Name:lower():find("detail") then
+                        obj.Parent = nil
+                    end
+                end
+            end
+        end
+    },
+    {
+        key = "disableStreaming",
+        name = "Disable Streaming",
+        func = function(state)
+            -- Desativa o streaming de partes (pode aumentar o uso de memória, mas reduz o lag de carregamento)
+            settings().Client.StreamingEnabled = not state
+        end
     }
 }
 
--- FPS BOOST ULTIMATE (ativa todas as 25 funções)
+-- FPS BOOST ULTIMATE (ativa todas as 35 funções)
 local function ToggleFPSBoostUltimate(state)
     scriptState.fpsBoostUltimate = state
     
@@ -957,7 +662,7 @@ end
 local function CreateBubbleGUI()
     -- Main ScreenGui
     mainGui = Instance.new("ScreenGui")
-    mainGui.Name = "VGZINSK_V2"
+    mainGui.Name = "VGZINSK_V3"
     mainGui.ResetOnSpawn = false
     mainGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
@@ -1025,7 +730,7 @@ local function CreateBubbleGUI()
     title.Size = UDim2.new(0.6, 0, 1, 0)
     title.Position = UDim2.new(0, 10, 0, 0)
     title.BackgroundTransparency = 1
-    title.Text = "⚡ VGZINSK V2"
+    title.Text = "⚡ VGZINSK V3"
     title.TextColor3 = Color3.fromRGB(0, 255, 255)
     title.Font = Enum.Font.GothamBold
     title.TextSize = 18
@@ -1205,6 +910,9 @@ local function CreateBubbleGUI()
                 connection:Disconnect()
             end
         end
+        
+        -- Reset WalkSpeed
+        SetSpeedValue(originalWalkSpeed)
     end)
     
     mainGui.Parent = CoreGui
@@ -1283,6 +991,66 @@ local function CreateToggleButton(name, description, callback, parent)
     return container
 end
 
+local function CreateSlider(name, description, minValue, maxValue, defaultValue, step, callback, parent)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, 0, 0, 80)
+    container.BackgroundColor3 = Color3.fromRGB(25, 25, 45)
+    container.BorderSizePixel = 0
+    container.Parent = parent
+    
+    local containerCorner = Instance.new("UICorner")
+    containerCorner.CornerRadius = UDim.new(0, 10)
+    containerCorner.Parent = container
+    
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, -20, 0, 25)
+    nameLabel.Position = UDim2.new(0, 10, 0, 5)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = name .. ": " .. tostring(defaultValue)
+    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextSize = 13
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.Parent = container
+    
+    local descLabel = Instance.new("TextLabel")
+    descLabel.Size = UDim2.new(1, -20, 0, 20)
+    descLabel.Position = UDim2.new(0, 10, 0, 30)
+    descLabel.BackgroundTransparency = 1
+    descLabel.Text = description
+    descLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+    descLabel.Font = Enum.Font.Gotham
+    descLabel.TextSize = 10
+    descLabel.TextXAlignment = Enum.TextXAlignment.Left
+    descLabel.Parent = container
+    
+    local slider = Instance.new("Slider")
+    slider.Size = UDim2.new(1, -20, 0, 20)
+    slider.Position = UDim2.new(0, 10, 0, 55)
+    slider.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+    slider.BorderSizePixel = 0
+    slider.Parent = container
+    
+    local sliderCorner = Instance.new("UICorner")
+    sliderCorner.CornerRadius = UDim.new(0, 8)
+    sliderCorner.Parent = slider
+    
+    slider.Value = defaultValue
+    slider.Min = minValue
+    slider.Max = maxValue
+    
+    slider.Changed:Connect(function(property)
+        if property == "Value" then
+            local newValue = math.floor(slider.Value / step) * step
+            slider.Value = newValue
+            nameLabel.Text = name .. ": " .. tostring(newValue)
+            callback(newValue)
+        end
+    end)
+    
+    return container
+end
+
 function CreateESPTab()
     local parent = menuFrame:FindFirstChild("ScrollingFrame")
     
@@ -1290,34 +1058,6 @@ function CreateESPTab()
         "👁️ ESP Players",
         "Mostrar jogadores inimigos",
         ToggleESPPlayers,
-        parent
-    )
-    
-    CreateToggleButton(
-        "🌈 Rainbow Base",
-        "Destaque arco-íris na base",
-        ToggleRainbowBase,
-        parent
-    )
-    
-    CreateToggleButton(
-        "🔍 X-Ray",
-        "Ver através das paredes",
-        ToggleXRay,
-        parent
-    )
-    
-    CreateToggleButton(
-        "⏱️ Timer ESP",
-        "Mostrar tempo de abertura",
-        ToggleTimerESP,
-        parent
-    )
-    
-    CreateToggleButton(
-        "📍 ESP Lines",
-        "Linhas para base e brainrot",
-        ToggleESPLines,
         parent
     )
 end
@@ -1333,212 +1073,22 @@ function CreateMainTab()
     )
     
     CreateToggleButton(
-        "🚀 Auto Steal",
-        "Roubar e voltar automático",
-        ToggleAutoSteal,
+        "⚡ Speed Boost",
+        "Ativa/Desativa o controle de velocidade",
+        ToggleSpeedBoost,
         parent
     )
     
-    -- Set Point Button
-    local setPointContainer = Instance.new("Frame")
-    setPointContainer.Size = UDim2.new(1, 0, 0, 50)
-    setPointContainer.BackgroundColor3 = Color3.fromRGB(25, 25, 45)
-    setPointContainer.BorderSizePixel = 0
-    setPointContainer.Parent = parent
-    
-    local setPointCorner = Instance.new("UICorner")
-    setPointCorner.CornerRadius = UDim.new(0, 10)
-    setPointCorner.Parent = setPointContainer
-    
-    local setPointBtn = Instance.new("TextButton")
-    setPointBtn.Size = UDim2.new(1, -20, 1, -10)
-    setPointBtn.Position = UDim2.new(0, 10, 0, 5)
-    setPointBtn.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
-    setPointBtn.BorderSizePixel = 0
-    setPointBtn.Text = "📍 SET POINT (Auto Steal)"
-    setPointBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    setPointBtn.Font = Enum.Font.GothamBold
-    setPointBtn.TextSize = 13
-    setPointBtn.Parent = setPointContainer
-    
-    local setPointBtnCorner = Instance.new("UICorner")
-    setPointBtnCorner.CornerRadius = UDim.new(0, 8)
-    setPointBtnCorner.Parent = setPointBtn
-    
-    setPointBtn.MouseButton1Click:Connect(function()
-        if SetAutoStealPoint() then
-            setPointBtn.Text = "✅ POINT SET!"
-            task.wait(1)
-            setPointBtn.Text = "📍 SET POINT (Auto Steal)"
-        end
-    end)
-    
-    CreateToggleButton(
-        "👻 Wallhack",
-        "Atravessar paredes (não chão)",
-        ToggleWallhack,
+    CreateSlider(
+        "🏃 Velocidade",
+        "Ajuste a velocidade de corrida (16 = normal)",
+        1, -- Super Lento
+        100, -- Super Rápido
+        originalWalkSpeed,
+        1,
+        SetSpeedValue,
         parent
     )
-    
-    CreateToggleButton(
-        "🚶 Anti AFK",
-        "Movimento automático para não ser kickado",
-        ToggleAntiAFK,
-        parent
-    )
-    
-    CreateToggleButton(
-        "❄️ Freeze",
-        "Congela inimigo ao acertar com taco",
-        ToggleFreeze,
-        parent
-    )
-    
-    -- Botão para Expel Banned (Kick)
-    local expelContainer = Instance.new("Frame")
-    expelContainer.Size = UDim2.new(1, 0, 0, 50)
-    expelContainer.BackgroundColor3 = Color3.fromRGB(25, 25, 45)
-    expelContainer.BorderSizePixel = 0
-    expelContainer.Parent = parent
-    
-    local expelCorner = Instance.new("UICorner")
-    expelCorner.CornerRadius = UDim.new(0, 10)
-    expelCorner.Parent = expelContainer
-    
-    local expelBtn = Instance.new("TextButton")
-    expelBtn.Size = UDim2.new(1, -20, 1, -10)
-    expelBtn.Position = UDim2.new(0, 10, 0, 5)
-    expelBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    expelBtn.BorderSizePixel = 0
-    expelBtn.Text = "❌ EXPEL BANNED (Kick Dono da Base)"
-    expelBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    expelBtn.Font = Enum.Font.GothamBold
-    expelBtn.TextSize = 13
-    expelBtn.Parent = expelContainer
-    
-    local expelBtnCorner = Instance.new("UICorner")
-    expelBtnCorner.CornerRadius = UDim.new(0, 8)
-    expelBtnCorner.Parent = expelBtn
-    
-    expelBtn.MouseButton1Click:Connect(function()
-        -- Lógica para encontrar o dono da base inimiga mais próxima
-        local targetPlayer = nil
-        local minDistance = math.huge
-        local rootPart = localPlayer.Character:FindFirstChild("HumanoidRootPart")
-        
-        if not rootPart then return end
-        
-        for _, base in pairs(Workspace:GetDescendants()) do
-            if base:IsA("Model") and base.Name:lower():find("base") and base.Name:lower() ~= "yourbase" then
-                -- Tentar extrair o nome do dono da base
-                local baseOwnerName = base.Name:match("Base_(.+)")
-                
-                if baseOwnerName then
-                    local owner = Players:FindFirstChild(baseOwnerName)
-                    if owner and owner.Character then
-                        local distance = (base:GetPivot().Position - rootPart.Position).Magnitude
-                        if distance < minDistance then
-                            minDistance = distance
-                            targetPlayer = owner
-                        end
-                    end
-                end
-            end
-        end
-        
-        if targetPlayer then
-            KickTargetPlayer(targetPlayer)
-            expelBtn.Text = "✅ KICK TENTADO: " .. targetPlayer.Name
-            task.delay(3, function()
-                expelBtn.Text = "❌ EXPEL BANNED (Kick Dono da Base)"
-            end)
-        else
-            expelBtn.Text = "⚠️ NENHUM ALVO ENCONTRADO"
-            task.delay(3, function()
-                expelBtn.Text = "❌ EXPEL BANNED (Kick Dono da Base)"
-            end)
-        end
-    end)
-    
-    CreateToggleButton(
-        "🚶 Anti AFK",
-        "Movimento automático para não ser kickado",
-        ToggleAntiAFK,
-        parent
-    )
-    
-    CreateToggleButton(
-        "❄️ Freeze",
-        "Congela inimigo ao acertar com taco",
-        ToggleFreeze,
-        parent
-    )
-    
-    -- Botão para Expel Banned (Kick)
-    local expelContainer = Instance.new("Frame")
-    expelContainer.Size = UDim2.new(1, 0, 0, 50)
-    expelContainer.BackgroundColor3 = Color3.fromRGB(25, 25, 45)
-    expelContainer.BorderSizePixel = 0
-    expelContainer.Parent = parent
-    
-    local expelCorner = Instance.new("UICorner")
-    expelCorner.CornerRadius = UDim.new(0, 10)
-    expelCorner.Parent = expelContainer
-    
-    local expelBtn = Instance.new("TextButton")
-    expelBtn.Size = UDim2.new(1, -20, 1, -10)
-    expelBtn.Position = UDim2.new(0, 10, 0, 5)
-    expelBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    expelBtn.BorderSizePixel = 0
-    expelBtn.Text = "❌ EXPEL BANNED (Kick Dono da Base)"
-    expelBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    expelBtn.Font = Enum.Font.GothamBold
-    expelBtn.TextSize = 13
-    expelBtn.Parent = expelContainer
-    
-    local expelBtnCorner = Instance.new("UICorner")
-    expelBtnCorner.CornerRadius = UDim.new(0, 8)
-    expelBtnCorner.Parent = expelBtn
-    
-    expelBtn.MouseButton1Click:Connect(function()
-        -- Lógica para encontrar o dono da base inimiga mais próxima
-        local targetPlayer = nil
-        local minDistance = math.huge
-        local rootPart = localPlayer.Character:FindFirstChild("HumanoidRootPart")
-        
-        if not rootPart then return end
-        
-        for _, base in pairs(Workspace:GetDescendants()) do
-            if base:IsA("Model") and base.Name:lower():find("base") and base.Name:lower() ~= "yourbase" then
-                -- Tentar extrair o nome do dono da base
-                local baseOwnerName = base.Name:match("Base_(.+)")
-                
-                if baseOwnerName then
-                    local owner = Players:FindFirstChild(baseOwnerName)
-                    if owner and owner.Character then
-                        local distance = (base:GetPivot().Position - rootPart.Position).Magnitude
-                        if distance < minDistance then
-                            minDistance = distance
-                            targetPlayer = owner
-                        end
-                    end
-                end
-            end
-        end
-        
-        if targetPlayer then
-            KickTargetPlayer(targetPlayer)
-            expelBtn.Text = "✅ KICK TENTADO: " .. targetPlayer.Name
-            task.delay(3, function()
-                expelBtn.Text = "❌ EXPEL BANNED (Kick Dono da Base)"
-            end)
-        else
-            expelBtn.Text = "⚠️ NENHUM ALVO ENCONTRADO"
-            task.delay(3, function()
-                expelBtn.Text = "❌ EXPEL BANNED (Kick Dono da Base)"
-            end)
-        end
-    end)
 end
 
 function CreateFPSTab()
@@ -1546,8 +1096,8 @@ function CreateFPSTab()
     
     -- FPS Boost Ultimate (primeiro)
     CreateToggleButton(
-        "🚀 FPS BOOST ULTIMATE",
-        "Ativa TODAS as otimizações",
+        "🚀 FPS BOOST ULTIMATE (35x)",
+        "Ativa TODAS as 35 otimizações de uma vez!",
         ToggleFPSBoostUltimate,
         parent
     )
@@ -1579,10 +1129,18 @@ end
     ═══════════════════════════════════════════════════════════
 ]]
 
+-- Inicializa a velocidade original
+if localPlayer.Character then
+    local humanoid = localPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        originalWalkSpeed = humanoid.WalkSpeed
+    end
+end
+
 CreateBubbleGUI()
 
 print("╔═══════════════════════════════════════════════════════════╗")
-print("║           VGZINSK V2 - MOBILE EDITION                     ║")
+print("║           VGZINSK V3 - MOBILE EDITION                     ║")
 print("║           Successfully Loaded!                            ║")
 print("║           Click the bubble to open menu                   ║")
 print("╚═══════════════════════════════════════════════════════════╝")
