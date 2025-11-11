@@ -869,7 +869,7 @@ local optimizationFunctions = {
         end
     },
 
-OptimizeCharacters = {
+    OptimizeCharacters = {
     name = "Personagens Otimizados",
     desc = "Reduz drasticamente detalhes dos personagens",
     func = function(state)
@@ -894,7 +894,9 @@ OptimizeCharacters = {
                 end
             end
         end
-    },
+    end
+    
+   },
     
     RemoveLightingEffects = {
         name = "Sem Efeitos de Luz",
