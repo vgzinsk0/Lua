@@ -35,7 +35,15 @@ local wallhackConnections = {}
 
 local teleportPoints = {}
 local currentTeleportPoint = nil
+local previousPosition = nil
 local teleportGui = nil
+local teleportBubble = nil
+local isTeleportMinimized = false
+
+-- NOVO: Sistema de bolha para menu principal
+local mainBubble = nil
+local isMainMinimized = false
+local mainScreenGui = nil
 
 local DATA_KEY = "VGZINSK_V1"
 
@@ -109,6 +117,50 @@ local function LoadSettings()
     return nil
 end
 
+-- SISTEMA DE MONITORAMENTO DE PERFORMANCE CORRIGIDO
+local function InitializeAdvancedPerformanceMonitor()
+    if connections.performanceMonitor then
+        connections.performanceMonitor:Disconnect()
+    end
+    
+    connections.performanceMonitor = RunService.Heartbeat:Connect(function()
+        -- FPS usando RenderStepped
+        local fpsSuccess, fpsResult = pcall(function()
+            local time = RunService.RenderStepped:Wait()
+            if time > 0 then
+                return math.floor(1 / time)
+            end
+            return 0
+        end)
+        performanceStats.fps = fpsSuccess and fpsResult or 0
+        
+        -- Memória corrigida
+        local memSuccess, memResult = pcall(function()
+            local totalMemory = 0
+            -- Usando método mais confiável para memória
+            for _, memoryTag in pairs(Enum.DeveloperMemoryTag:GetEnumItems()) do
+                local success, value = pcall(function()
+                    return Stats:GetMemoryUsageMbForTag(memoryTag)
+                end)
+                if success and value then
+                    totalMemory = totalMemory + value
+                end
+            end
+            return math.floor(totalMemory)
+        end)
+        performanceStats.memory = memSuccess and memResult or 0
+        
+        -- Ping usando NetworkClient
+        local pingSuccess, pingResult = pcall(function()
+            return math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
+        end)
+        performanceStats.ping = pingSuccess and pingResult or 0
+        
+        -- Objetos no Workspace
+        performanceStats.objects = #Workspace:GetDescendants()
+    end)
+end
+
 local function InitializeStableFPS()
     if connections.fpsControl then
         connections.fpsControl:Disconnect()
@@ -133,36 +185,6 @@ local function InitializeStableFPS()
     settings().Rendering.MeshCacheSize = 0
     settings().Rendering.TextureCacheSize = 0
     settings().Rendering.EagerBulkExecution = true
-end
-
--- SISTEMA DE MONITORAMENTO DE PERFORMANCE AVANÇADO
-local function InitializeAdvancedPerformanceMonitor()
-    if connections.performanceMonitor then
-        connections.performanceMonitor:Disconnect()
-    end
-    
-    connections.performanceMonitor = RunService.Heartbeat:Connect(function()
-        local success, currentFPS = pcall(function()
-            return math.floor(1 / RunService.RenderStepped:Wait())
-        end)
-        performanceStats.fps = success and currentFPS or 0
-        
-        -- Monitorar memória avançado
-        local success, graphicsMemory = pcall(function()
-            return Stats:GetMemoryUsageMbForTag(Enum.DeveloperMemoryTag.Graphics) or 0
-        end)
-        local success2, scriptMemory = pcall(function()
-            return Stats:GetMemoryUsageMbForTag(Enum.DeveloperMemoryTag.Script) or 0
-        end)
-        local success3, physicsMemory = pcall(function()
-            return Stats:GetMemoryUsageMbForTag(Enum.DeveloperMemoryTag.Physics) or 0
-        end)
-        
-        performanceStats.memory = math.floor((success and graphicsMemory or 0) + (success2 and scriptMemory or 0) + (success3 and physicsMemory or 0))
-        
-        -- Monitorar objetos
-        performanceStats.objects = #Workspace:GetDescendants()
-    end)
 end
 
 -- SISTEMA PLATFORM BUILDER AVANÇADO
@@ -262,15 +284,28 @@ local function TogglePlatformBuilder(state)
     SaveSettings()
 end
 
--- SISTEMA WALLHACK AVANÇADO
+-- SISTEMA WALLHACK AVANÇADO CORRIGIDO
+local function IsGroundPart(part)
+    -- Verifica se a parte é provavelmente o chão
+    if part.Position.Y < 5 then return true end
+    if part.Name:lower():find("floor") or part.Name:lower():find("ground") or part.Name:lower():find("base") or part.Name:lower():find("chao") then
+        return true
+    end
+    -- Verifica se a parte está em uma posição muito baixa (provavelmente chão)
+    if part.Position.Y < 10 and part.Size.Y > 2 and part.Size.X > 10 and part.Size.Z > 10 then
+        return true
+    end
+    return false
+end
+
 local function ToggleWallhack(state)
     wallhackEnabled = state
     
     if state then
-        -- Remover colisões de paredes e obstáculos
+        -- Remover colisões de paredes e obstáculos (mas não do chão)
         for _, part in pairs(Workspace:GetDescendants()) do
             if part:IsA("Part") or part:IsA("MeshPart") or part:IsA("UnionOperation") then
-                if part.CanCollide and part.Parent ~= localPlayer.Character then
+                if part.CanCollide and part.Parent ~= localPlayer.Character and not IsGroundPart(part) then
                     originalCollisions[part] = true
                     part.CanCollide = false
                     part.Transparency = 0.7
@@ -292,7 +327,7 @@ local function ToggleWallhack(state)
         -- Monitorar novos objetos
         wallhackConnections.descendantAdded = Workspace.DescendantAdded:Connect(function(descendant)
             if descendant:IsA("Part") or descendant:IsA("MeshPart") or descendant:IsA("UnionOperation") then
-                if descendant.CanCollide and descendant.Parent ~= localPlayer.Character then
+                if descendant.CanCollide and descendant.Parent ~= localPlayer.Character and not IsGroundPart(descendant) then
                     originalCollisions[descendant] = true
                     descendant.CanCollide = false
                     descendant.Transparency = 0.7
@@ -345,10 +380,87 @@ local function ToggleWallhack(state)
     SaveSettings()
 end
 
--- SISTEMA TELEPORT AVANÇADO
+-- SISTEMA TELEPORT AVANÇADO COM NOVAS MECÂNICAS
+local function CreateTeleportBubble()
+    if teleportBubble and teleportBubble:IsDescendantOf(playerGui) then
+        teleportBubble:Destroy()
+    end
+    
+    teleportBubble = Instance.new("ScreenGui")
+    teleportBubble.Name = "VGZINSK_TeleportBubble"
+    teleportBubble.ResetOnSpawn = false
+    teleportBubble.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    local bubbleFrame = Instance.new("Frame")
+    bubbleFrame.Size = UDim2.new(0, 60, 0, 60)
+    bubbleFrame.Position = UDim2.new(1, -80, 0.5, -30)
+    bubbleFrame.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
+    bubbleFrame.BorderSizePixel = 0
+    bubbleFrame.Active = true
+    bubbleFrame.Draggable = true
+    
+    local bubbleCorner = Instance.new("UICorner")
+    bubbleCorner.CornerRadius = UDim.new(1, 0)
+    bubbleCorner.Parent = bubbleFrame
+    
+    local bubbleStroke = Instance.new("UIStroke")
+    bubbleStroke.Thickness = 3
+    bubbleStroke.Color = Color3.fromRGB(0, 255, 255)
+    bubbleStroke.Parent = bubbleFrame
+    
+    local bubbleGlow = Instance.new("UIGradient")
+    bubbleGlow.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 200, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 100, 200))
+    })
+    bubbleGlow.Rotation = 45
+    bubbleGlow.Parent = bubbleFrame
+    
+    local bubbleIcon = Instance.new("TextLabel")
+    bubbleIcon.Size = UDim2.new(1, 0, 1, 0)
+    bubbleIcon.BackgroundTransparency = 1
+    bubbleIcon.Text = "⚡"
+    bubbleIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+    bubbleIcon.Font = Enum.Font.GothamBold
+    bubbleIcon.TextSize = 20
+    bubbleIcon.Parent = bubbleFrame
+    
+    -- Animação de pulsação
+    coroutine.wrap(function()
+        while teleportBubble and teleportBubble.Parent do
+            TweenService:Create(bubbleFrame, TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
+                Size = UDim2.new(0, 65, 0, 65)
+            }):Play()
+            wait(1)
+            TweenService:Create(bubbleFrame, TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
+                Size = UDim2.new(0, 60, 0, 60)
+            }):Play()
+            wait(1)
+        end
+    end)()
+    
+    bubbleFrame.Parent = teleportBubble
+    teleportBubble.Parent = playerGui
+    
+    -- Configurar clique para restaurar
+    bubbleFrame.MouseButton1Click:Connect(function()
+        if teleportGui then
+            teleportGui.Enabled = true
+            isTeleportMinimized = false
+            teleportBubble:Destroy()
+            teleportBubble = nil
+        end
+    end)
+    
+    return teleportBubble
+end
+
 local function CreateTeleportGUI()
     if teleportGui and teleportGui:IsDescendantOf(playerGui) then
         teleportGui:Destroy()
+    end
+    if teleportBubble and teleportBubble:IsDescendantOf(playerGui) then
+        teleportBubble:Destroy()
     end
     
     teleportGui = Instance.new("ScreenGui")
@@ -357,8 +469,8 @@ local function CreateTeleportGUI()
     teleportGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
     local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 280, 0, 200)
-    mainFrame.Position = UDim2.new(0.5, -140, 0.5, -100)
+    mainFrame.Size = UDim2.new(0, 320, 0, 250)
+    mainFrame.Position = UDim2.new(0.5, -160, 0.5, -125)
     mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
     mainFrame.BorderSizePixel = 0
     mainFrame.Active = true
@@ -376,7 +488,7 @@ local function CreateTeleportGUI()
     header.Parent = mainFrame
     
     local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 1, 0)
+    title.Size = UDim2.new(0.6, 0, 1, 0)
     title.BackgroundTransparency = 1
     title.Text = "⚡ TELEPORT HACK"
     title.TextColor3 = Color3.fromRGB(0, 255, 255)
@@ -384,9 +496,20 @@ local function CreateTeleportGUI()
     title.TextSize = 14
     title.Parent = header
     
+    local minimizeButton = Instance.new("TextButton")
+    minimizeButton.Size = UDim2.new(0, 25, 0, 25)
+    minimizeButton.Position = UDim2.new(1, -55, 0, 2)
+    minimizeButton.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
+    minimizeButton.BorderSizePixel = 0
+    minimizeButton.Text = "_"
+    minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    minimizeButton.Font = Enum.Font.GothamBold
+    minimizeButton.TextSize = 16
+    minimizeButton.Parent = header
+    
     local closeButton = Instance.new("TextButton")
     closeButton.Size = UDim2.new(0, 25, 0, 25)
-    closeButton.Position = UDim2.new(1, -30, 0, 2)
+    closeButton.Position = UDim2.new(1, -25, 0, 2)
     closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     closeButton.BorderSizePixel = 0
     closeButton.Text = "X"
@@ -403,7 +526,7 @@ local function CreateTeleportGUI()
     
     -- Botão Set Point
     local setPointButton = Instance.new("TextButton")
-    setPointButton.Size = UDim2.new(1, 0, 0, 40)
+    setPointButton.Size = UDim2.new(1, 0, 0, 35)
     setPointButton.Position = UDim2.new(0, 0, 0, 0)
     setPointButton.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
     setPointButton.BorderSizePixel = 0
@@ -415,23 +538,35 @@ local function CreateTeleportGUI()
     
     -- Botão Teleport
     local teleportButton = Instance.new("TextButton")
-    teleportButton.Size = UDim2.new(1, 0, 0, 40)
-    teleportButton.Position = UDim2.new(0, 0, 0, 50)
+    teleportButton.Size = UDim2.new(1, 0, 0, 35)
+    teleportButton.Position = UDim2.new(0, 0, 0, 45)
     teleportButton.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
     teleportButton.BorderSizePixel = 0
-    teleportButton.Text = "🚀 TELEPORT"
+    teleportButton.Text = "🚀 TELEPORT TO BASE"
     teleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     teleportButton.Font = Enum.Font.GothamBold
     teleportButton.TextSize = 12
     teleportButton.Parent = contentFrame
     
+    -- NOVO BOTÃO: Voltar para posição anterior
+    local backButton = Instance.new("TextButton")
+    backButton.Size = UDim2.new(1, 0, 0, 35)
+    backButton.Position = UDim2.new(0, 0, 0, 90)
+    backButton.BackgroundColor3 = Color3.fromRGB(150, 0, 200)
+    backButton.BorderSizePixel = 0
+    backButton.Text = "↩️ BACK TO PREVIOUS"
+    backButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    backButton.Font = Enum.Font.GothamBold
+    backButton.TextSize = 12
+    backButton.Parent = contentFrame
+    
     -- Display do ponto atual
     local pointDisplay = Instance.new("TextLabel")
     pointDisplay.Size = UDim2.new(1, 0, 0, 60)
-    pointDisplay.Position = UDim2.new(0, 0, 0, 100)
+    pointDisplay.Position = UDim2.new(0, 0, 0, 135)
     pointDisplay.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
     pointDisplay.BorderSizePixel = 0
-    pointDisplay.Text = "No point set"
+    pointDisplay.Text = "No point set\nPrevious: None"
     pointDisplay.TextColor3 = Color3.fromRGB(255, 255, 255)
     pointDisplay.Font = Enum.Font.Gotham
     pointDisplay.TextSize = 11
@@ -448,8 +583,9 @@ local function CreateTeleportGUI()
                     timestamp = os.time(),
                     map = game.PlaceId
                 }
-                pointDisplay.Text = string.format("Point Set!\nX: %.1f\nY: %.1f\nZ: %.1f", 
-                    rootPart.Position.X, rootPart.Position.Y, rootPart.Position.Z)
+                pointDisplay.Text = string.format("Point Set!\nX: %.1f\nY: %.1f\nZ: %.1f\nPrevious: %s", 
+                    rootPart.Position.X, rootPart.Position.Y, rootPart.Position.Z,
+                    previousPosition and "Saved" or "None")
                 savedSettings.currentTeleportPoint = currentTeleportPoint
                 SaveSettings()
             end
@@ -460,12 +596,36 @@ local function CreateTeleportGUI()
         if currentTeleportPoint and localPlayer.Character then
             local rootPart = localPlayer.Character:FindFirstChild("HumanoidRootPart")
             if rootPart then
+                -- Salvar posição atual antes de teleportar
+                previousPosition = rootPart.Position
                 -- Teleport seguro
                 rootPart.CFrame = CFrame.new(currentTeleportPoint.position)
-                pointDisplay.Text = "Teleported successfully!"
+                pointDisplay.Text = string.format("Teleported to base!\nPrevious position saved\nX: %.1f\nY: %.1f\nZ: %.1f", 
+                    previousPosition.X, previousPosition.Y, previousPosition.Z)
             end
         else
             pointDisplay.Text = "No teleport point set!"
+        end
+    end)
+    
+    backButton.MouseButton1Click:Connect(function()
+        if previousPosition and localPlayer.Character then
+            local rootPart = localPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if rootPart then
+                -- Teleport de volta para posição anterior
+                rootPart.CFrame = CFrame.new(previousPosition)
+                pointDisplay.Text = "Returned to previous position!"
+            end
+        else
+            pointDisplay.Text = "No previous position saved!"
+        end
+    end)
+    
+    minimizeButton.MouseButton1Click:Connect(function()
+        if teleportGui then
+            teleportGui.Enabled = false
+            isTeleportMinimized = true
+            CreateTeleportBubble()
         end
     end)
     
@@ -473,14 +633,18 @@ local function CreateTeleportGUI()
         if teleportGui then
             teleportGui:Destroy()
         end
+        if teleportBubble then
+            teleportBubble:Destroy()
+        end
     end)
     
     -- Carregar ponto salvo
     local loadedData = LoadSettings()
     if loadedData and loadedData.currentTeleportPoint then
         currentTeleportPoint = loadedData.currentTeleportPoint
-        pointDisplay.Text = string.format("Point Loaded!\nX: %.1f\nY: %.1f\nZ: %.1f", 
-            currentTeleportPoint.position.X, currentTeleportPoint.position.Y, currentTeleportPoint.position.Z)
+        pointDisplay.Text = string.format("Point Loaded!\nX: %.1f\nY: %.1f\nZ: %.1f\nPrevious: %s", 
+            currentTeleportPoint.position.X, currentTeleportPoint.position.Y, currentTeleportPoint.position.Z,
+            previousPosition and "Saved" or "None")
     end
     
     mainFrame.Parent = teleportGui
@@ -497,6 +661,9 @@ local function ToggleTeleport(state)
     else
         if teleportGui and teleportGui:IsDescendantOf(playerGui) then
             teleportGui:Destroy()
+        end
+        if teleportBubble and teleportBubble:IsDescendantOf(playerGui) then
+            teleportBubble:Destroy()
         end
     end
     
@@ -545,7 +712,8 @@ local function ToggleAutoLoad(state)
     SaveSettings()
 end
 
--- ========== SISTEMA DE 25 FUNÇÕES DE OTIMIZAÇÃO AVANÇADAS ==========
+-- ========== SISTEMA DE 24 FUNÇÕES DE OTIMIZAÇÃO AVANÇADAS ==========
+-- REMOVIDA: ReduceQuality (função 18)
 
 local optimizationFunctions = {
     RemoveCharacterAnimations = {
@@ -890,22 +1058,8 @@ local optimizationFunctions = {
         end
     },
     
-    ReduceQuality = {
-        name = "Qualidade Reduzida",
-        desc = "Reduz qualidade geral do jogo radicalmente",
-        func = function(state)
-            if state then
-                for _, obj in pairs(Workspace:GetDescendants()) do
-                    if obj:IsA("Part") then
-                        obj.Reflectance = 0
-                        obj.Material = Enum.Material.Plastic
-                        obj.Transparency = 0.1
-                    end
-                end
-            end
-        end
-    },
-
+    -- REMOVIDA: ReduceQuality (função 18)
+    
     OptimizeCharacters = {
         name = "Personagens Otimizados",
         desc = "Reduz drasticamente detalhes dos personagens",
@@ -1010,230 +1164,122 @@ local optimizationFunctions = {
                 end)()
             end
         end
+    },
+    
+    -- FUNÇÃO EXTRA PARA COMPENSAR A REMOÇÃO
+    AdvancedFPSBoost = {
+        name = "Boost de FPS Avançado",
+        desc = "Otimização extrema para máximo FPS",
+        func = function(state)
+            if state then
+                -- Configurações avançadas de performance
+                settings().Rendering.EnableFRM = false
+                settings().Rendering.QualityLevel = 1
+                settings().Physics.PhysicsEnvironmentalThrottle = 2
+                
+                -- Limpeza de objetos desnecessários
+                coroutine.wrap(function()
+                    while true do
+                        wait(30)
+                        for _, obj in pairs(Workspace:GetDescendants()) do
+                            if obj:IsA("Part") and obj.Transparency > 0.8 then
+                                obj:Destroy()
+                            end
+                        end
+                    end
+                end)()
+            end
+        end
     }
 }
 
--- CRIAR A INTERFACE PRINCIPAL
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "VGZINSK_V1"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 380, 0, 550)
-MainFrame.Position = UDim2.new(0.5, -190, 0.5, -275)
-MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
-
-local OuterGlow = Instance.new("UIStroke")
-OuterGlow.Thickness = 4
-OuterGlow.Color = Color3.fromRGB(0, 255, 255)
-OuterGlow.Transparency = 0.2
-OuterGlow.Parent = MainFrame
-
-local InnerGlow = Instance.new("UIStroke")
-InnerGlow.Thickness = 2
-InnerGlow.Color = Color3.fromRGB(255, 0, 255)
-InnerGlow.Transparency = 0.3
-InnerGlow.Parent = MainFrame
-
-local Header = Instance.new("Frame")
-Header.Name = "Header"
-Header.Size = UDim2.new(1, 0, 0, 45)
-Header.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
-Header.BorderSizePixel = 0
-
-local HeaderGradient = Instance.new("UIGradient")
-HeaderGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 30, 60)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(60, 0, 60)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 60, 30))
-})
-HeaderGradient.Rotation = 45
-HeaderGradient.Parent = Header
-
-local Title = Instance.new("TextLabel")
-Title.Name = "Title"
-Title.Size = UDim2.new(0.7, 0, 1, 0)
-Title.Position = UDim2.new(0, 15, 0, 0)
-Title.BackgroundTransparency = 1
-Title.Text = "⚡ VGZINSK V1"
-Title.TextColor3 = Color3.fromRGB(0, 255, 255)
-Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Font = Enum.Font.GothamBlack
-Title.TextSize = 16
-Title.TextStrokeTransparency = 0.6
-Title.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-Title.Parent = Header
-
-local MinimizeButton = Instance.new("TextButton")
-MinimizeButton.Name = "MinimizeButton"
-MinimizeButton.Size = UDim2.new(0, 35, 0, 35)
-MinimizeButton.Position = UDim2.new(1, -75, 0, 5)
-MinimizeButton.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
-MinimizeButton.BorderSizePixel = 0
-MinimizeButton.Text = "_"
-MinimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-MinimizeButton.Font = Enum.Font.GothamBold
-MinimizeButton.TextSize = 18
-MinimizeButton.Parent = Header
-
-local CloseButton = Instance.new("TextButton")
-CloseButton.Name = "CloseButton"
-CloseButton.Size = UDim2.new(0, 35, 0, 35)
-CloseButton.Position = UDim2.new(1, -35, 0, 5)
-CloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-CloseButton.BorderSizePixel = 0
-CloseButton.Text = "X"
-CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseButton.Font = Enum.Font.GothamBold
-CloseButton.TextSize = 16
-CloseButton.Parent = Header
-
-local MainContainer = Instance.new("ScrollingFrame")
-MainContainer.Name = "MainContainer"
-MainContainer.Size = UDim2.new(1, -15, 1, -60)
-MainContainer.Position = UDim2.new(0, 7, 0, 50)
-MainContainer.BackgroundTransparency = 1
-MainContainer.BorderSizePixel = 0
-MainContainer.ScrollBarThickness = 8
-MainContainer.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 255)
-MainContainer.ScrollBarImageTransparency = 0.5
-MainContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-
-local function CreateCyberToggle(name, description, defaultState, callback, settingKey)
-    local ToggleFrame = Instance.new("Frame")
-    ToggleFrame.Size = UDim2.new(1, 0, 0, 50)
-    ToggleFrame.BackgroundTransparency = 1
-    ToggleFrame.BorderSizePixel = 0
-    
-    local ToggleBG = Instance.new("Frame")
-    ToggleBG.Size = UDim2.new(1, 0, 1, 0)
-    ToggleBG.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
-    ToggleBG.BorderSizePixel = 0
-    ToggleBG.Parent = ToggleFrame
-    
-    local ToggleGradient = Instance.new("UIGradient")
-    ToggleGradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(35, 35, 55)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 25, 40))
-    })
-    ToggleGradient.Parent = ToggleBG
-    
-    local ToggleStroke = Instance.new("UIStroke")
-    ToggleStroke.Thickness = 1
-    ToggleStroke.Color = Color3.fromRGB(60, 60, 80)
-    ToggleStroke.Parent = ToggleBG
-    
-    local Icon = Instance.new("TextLabel")
-    Icon.Size = UDim2.new(0, 30, 0, 30)
-    Icon.Position = UDim2.new(0, 8, 0, 10)
-    Icon.BackgroundTransparency = 1
-    Icon.Text = "🔧"
-    Icon.TextColor3 = Color3.fromRGB(0, 255, 255)
-    Icon.Font = Enum.Font.GothamBold
-    Icon.TextSize = 16
-    Icon.Parent = ToggleFrame
-    
-    local ToggleLabel = Instance.new("TextLabel")
-    ToggleLabel.Size = UDim2.new(0.6, 0, 0.5, 0)
-    ToggleLabel.Position = UDim2.new(0, 45, 0, 5)
-    ToggleLabel.BackgroundTransparency = 1
-    ToggleLabel.Text = name
-    ToggleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ToggleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    ToggleLabel.Font = Enum.Font.GothamBold
-    ToggleLabel.TextSize = 13
-    ToggleLabel.Parent = ToggleFrame
-    
-    local DescriptionLabel = Instance.new("TextLabel")
-    DescriptionLabel.Size = UDim2.new(0.6, 0, 0.5, 0)
-    DescriptionLabel.Position = UDim2.new(0, 45, 0.5, 0)
-    DescriptionLabel.BackgroundTransparency = 1
-    DescriptionLabel.Text = description
-    DescriptionLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
-    DescriptionLabel.TextXAlignment = Enum.TextXAlignment.Left
-    DescriptionLabel.Font = Enum.Font.Gotham
-    DescriptionLabel.TextSize = 10
-    DescriptionLabel.Parent = ToggleFrame
-    
-    local ToggleButton = Instance.new("TextButton")
-    ToggleButton.Size = UDim2.new(0, 50, 0, 25)
-    ToggleButton.Position = UDim2.new(1, -60, 0.5, -12)
-    ToggleButton.BackgroundColor3 = defaultState and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(60, 60, 80)
-    ToggleButton.BorderSizePixel = 0
-    ToggleButton.Text = ""
-    ToggleButton.AutoButtonColor = false
-    ToggleButton.Parent = ToggleFrame
-    
-    local ToggleButtonStroke = Instance.new("UIStroke")
-    ToggleButtonStroke.Thickness = 2
-    ToggleButtonStroke.Color = Color3.fromRGB(100, 100, 120)
-    ToggleButtonStroke.Parent = ToggleButton
-    
-    local ToggleKnob = Instance.new("Frame")
-    ToggleKnob.Size = UDim2.new(0, 21, 0, 21)
-    ToggleKnob.Position = defaultState and UDim2.new(1, -23, 0.5, -10) or UDim2.new(0, 2, 0.5, -10)
-    ToggleKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    ToggleKnob.BorderSizePixel = 0
-    ToggleKnob.Parent = ToggleButton
-    
-    local KnobGradient = Instance.new("UIGradient")
-    KnobGradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(220, 220, 220))
-    })
-    KnobGradient.Parent = ToggleKnob
-    
-    local isEnabled = defaultState
-    
-    if isEnabled then
-        pcall(callback, true)
-        savedSettings[settingKey] = true
+-- SISTEMA DE BOLHA PARA MENU PRINCIPAL
+local function CreateMainBubble()
+    if mainBubble and mainBubble:IsDescendantOf(playerGui) then
+        mainBubble:Destroy()
     end
     
-    ToggleButton.MouseEnter:Connect(function()
-        if isEnabled then
-            TweenService:Create(ToggleButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 230, 0)}):Play()
-        else
-            TweenService:Create(ToggleButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(80, 80, 100)}):Play()
+    mainBubble = Instance.new("ScreenGui")
+    mainBubble.Name = "VGZINSK_MainBubble"
+    mainBubble.ResetOnSpawn = false
+    mainBubble.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    local bubbleFrame = Instance.new("Frame")
+    bubbleFrame.Size = UDim2.new(0, 70, 0, 70)
+    bubbleFrame.Position = UDim2.new(0, 20, 0.5, -35)
+    bubbleFrame.BackgroundColor3 = Color3.fromRGB(255, 50, 150)
+    bubbleFrame.BorderSizePixel = 0
+    bubbleFrame.Active = true
+    bubbleFrame.Draggable = true
+    
+    local bubbleCorner = Instance.new("UICorner")
+    bubbleCorner.CornerRadius = UDim.new(1, 0)
+    bubbleCorner.Parent = bubbleFrame
+    
+    local bubbleStroke = Instance.new("UIStroke")
+    bubbleStroke.Thickness = 3
+    bubbleStroke.Color = Color3.fromRGB(255, 100, 200)
+    bubbleStroke.Parent = bubbleFrame
+    
+    local bubbleGlow = Instance.new("UIGradient")
+    bubbleGlow.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 100, 200)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 50, 150))
+    })
+    bubbleGlow.Rotation = 45
+    bubbleGlow.Parent = bubbleFrame
+    
+    local bubbleIcon = Instance.new("TextLabel")
+    bubbleIcon.Size = UDim2.new(1, 0, 1, 0)
+    bubbleIcon.BackgroundTransparency = 1
+    bubbleIcon.Text = "🎮"
+    bubbleIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+    bubbleIcon.Font = Enum.Font.GothamBold
+    bubbleIcon.TextSize = 24
+    bubbleIcon.Parent = bubbleFrame
+    
+    -- Animação de pulsação
+    coroutine.wrap(function()
+        while mainBubble and mainBubble.Parent do
+            TweenService:Create(bubbleFrame, TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
+                Size = UDim2.new(0, 75, 0, 75)
+            }):Play()
+            wait(1)
+            TweenService:Create(bubbleFrame, TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
+                Size = UDim2.new(0, 70, 0, 70)
+            }):Play()
+            wait(1)
+        end
+    end)()
+    
+    bubbleFrame.Parent = mainBubble
+    mainBubble.Parent = playerGui
+    
+    -- Configurar clique para restaurar menu principal
+    bubbleFrame.MouseButton1Click:Connect(function()
+        if mainScreenGui then
+            mainScreenGui.Enabled = true
+            isMainMinimized = false
+            mainBubble:Destroy()
+            mainBubble = nil
         end
     end)
     
-    ToggleButton.MouseLeave:Connect(function()
-        if isEnabled then
-            TweenService:Create(ToggleButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 200, 0)}):Play()
-        else
-            TweenService:Create(ToggleButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60, 60, 80)}):Play()
-        end
-    end)
-    
-    ToggleButton.MouseButton1Click:Connect(function()
-        isEnabled = not isEnabled
-        
-        if isEnabled then
-            TweenService:Create(ToggleButton, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(0, 200, 0)}):Play()
-            TweenService:Create(ToggleKnob, TweenInfo.new(0.3), {Position = UDim2.new(1, -23, 0.5, -10)}):Play()
-        else
-            TweenService:Create(ToggleButton, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(60, 60, 80)}):Play()
-            TweenService:Create(ToggleKnob, TweenInfo.new(0.3), {Position = UDim2.new(0, 2, 0.5, -10)}):Play()
-        end
-        
-        pcall(callback, isEnabled)
-        
-        savedSettings[settingKey] = isEnabled
-        SaveSettings()
-    end)
-    
-    return ToggleFrame
+    return mainBubble
 end
 
+local function MinimizeMainGUI()
+    if mainScreenGui then
+        mainScreenGui.Enabled = false
+        isMainMinimized = true
+        CreateMainBubble()
+    end
+end
+
+-- FUNÇÃO DE PERFORMANCE DISPLAY CORRIGIDA
 local function CreatePerformanceDisplay()
     local perfFrame = Instance.new("Frame")
-    perfFrame.Size = UDim2.new(1, 0, 0, 40)
+    perfFrame.Size = UDim2.new(1, 0, 0, 50)
     perfFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
     perfFrame.BorderSizePixel = 0
     
@@ -1245,18 +1291,18 @@ local function CreatePerformanceDisplay()
     perfGradient.Parent = perfFrame
     
     local fpsLabel = Instance.new("TextLabel")
-    fpsLabel.Size = UDim2.new(0.33, 0, 1, 0)
+    fpsLabel.Size = UDim2.new(0.25, 0, 1, 0)
     fpsLabel.Position = UDim2.new(0, 0, 0, 0)
     fpsLabel.BackgroundTransparency = 1
-    fpsLabel.Text = "FPS: 60"
+    fpsLabel.Text = "FPS: 0"
     fpsLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
     fpsLabel.Font = Enum.Font.GothamBold
     fpsLabel.TextSize = 12
     fpsLabel.Parent = perfFrame
     
     local memoryLabel = Instance.new("TextLabel")
-    memoryLabel.Size = UDim2.new(0.33, 0, 1, 0)
-    memoryLabel.Position = UDim2.new(0.33, 0, 0, 0)
+    memoryLabel.Size = UDim2.new(0.25, 0, 1, 0)
+    memoryLabel.Position = UDim2.new(0.25, 0, 0, 0)
     memoryLabel.BackgroundTransparency = 1
     memoryLabel.Text = "RAM: 0MB"
     memoryLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
@@ -1264,9 +1310,19 @@ local function CreatePerformanceDisplay()
     memoryLabel.TextSize = 12
     memoryLabel.Parent = perfFrame
     
+    local pingLabel = Instance.new("TextLabel")
+    pingLabel.Size = UDim2.new(0.25, 0, 1, 0)
+    pingLabel.Position = UDim2.new(0.5, 0, 0, 0)
+    pingLabel.BackgroundTransparency = 1
+    pingLabel.Text = "PING: 0ms"
+    pingLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
+    pingLabel.Font = Enum.Font.GothamBold
+    pingLabel.TextSize = 12
+    pingLabel.Parent = perfFrame
+    
     local objectsLabel = Instance.new("TextLabel")
-    objectsLabel.Size = UDim2.new(0.34, 0, 1, 0)
-    objectsLabel.Position = UDim2.new(0.66, 0, 0, 0)
+    objectsLabel.Size = UDim2.new(0.25, 0, 1, 0)
+    objectsLabel.Position = UDim2.new(0.75, 0, 0, 0)
     objectsLabel.BackgroundTransparency = 1
     objectsLabel.Text = "OBJ: 0"
     objectsLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
@@ -1274,11 +1330,14 @@ local function CreatePerformanceDisplay()
     objectsLabel.TextSize = 12
     objectsLabel.Parent = perfFrame
     
+    -- Atualização em tempo real CORRIGIDA
     connections.performanceDisplay = RunService.Heartbeat:Connect(function()
         fpsLabel.Text = "FPS: " .. performanceStats.fps
         memoryLabel.Text = "RAM: " .. performanceStats.memory .. "MB"
+        pingLabel.Text = "PING: " .. performanceStats.ping .. "ms"
         objectsLabel.Text = "OBJ: " .. performanceStats.objects
         
+        -- Cores dinâmicas baseadas nos valores
         if performanceStats.fps >= 50 then
             fpsLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
         elseif performanceStats.fps >= 30 then
@@ -1294,256 +1353,417 @@ local function CreatePerformanceDisplay()
         else
             memoryLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
         end
+        
+        if performanceStats.ping < 100 then
+            pingLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+        elseif performanceStats.ping < 200 then
+            pingLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+        else
+            pingLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
+        end
     end)
     
     return perfFrame
 end
 
--- CONFIGURAR A INTERFACE
-local currentY = 0
-
-local perfDisplay = CreatePerformanceDisplay()
-perfDisplay.Position = UDim2.new(0, 0, 0, currentY)
-perfDisplay.Parent = MainContainer
-currentY = currentY + 45
-
-local functionToggles = {
-    {key = "autoLoad", name = "🔄 AUTO LOAD", desc = "Carrega configurações automaticamente", func = ToggleAutoLoad, default = false},
-    {key = "platformBuilder", name = "🏗️ PLATFORM BUILDER", desc = "Cria plataformas ao pular", func = TogglePlatformBuilder, default = false},
-    {key = "wallhack", name = "👻 WALLHACK", desc = "Atravessar paredes sem colisão", func = ToggleWallhack, default = false},
-    {key = "teleport", name = "💫 TELEPORT SYSTEM", desc = "Sistema de teletransporte avançado", func = ToggleTeleport, default = false},
+-- CRIAR A INTERFACE PRINCIPAL COM SISTEMA DE BOLHA
+local function CreateMainGUI()
+    if mainScreenGui and mainScreenGui:IsDescendantOf(playerGui) then
+        mainScreenGui:Destroy()
+    end
+    if mainBubble and mainBubble:IsDescendantOf(playerGui) then
+        mainBubble:Destroy()
+    end
     
-    -- OTIMIZAÇÕES DE PERFORMANCE
-    {key = "RemoveCharacterAnimations", name = "🎭 SEM ANIMAÇÕES", desc = "Remove movimentos do personagem", func = optimizationFunctions.RemoveCharacterAnimations.func, default = false},
-    {key = "OptimizeLighting", name = "💡 LUZ OTIMIZADA", desc = "Iluminação mínima avançada", func = optimizationFunctions.OptimizeLighting.func, default = false},
-    {key = "RemoveAllSkins", name = "⚫ SKINS PRETAS", desc = "Todos players completamente pretos", func = optimizationFunctions.RemoveAllSkins.func, default = false},
-    {key = "ReduceRenderDistance", name = "👁️ RENDER REDUZIDO", desc = "Distância de renderização mínima", func = optimizationFunctions.ReduceRenderDistance.func, default = false},
-    {key = "RemoveParticles", name = "✨ SEM PARTÍCULAS", desc = "Remove efeitos visuais", func = optimizationFunctions.RemoveParticles.func, default = false},
-    {key = "RemoveTextures", name = "🖼️ SEM TEXTURAS", desc = "Texturas completamente removidas", func = optimizationFunctions.RemoveTextures.func, default = false},
-    {key = "OptimizeGraphics", name = "🎮 GRÁFICOS MÍNIMOS", desc = "Configurações gráficas no mínimo", func = optimizationFunctions.OptimizeGraphics.func, default = false},
-    {key = "DisablePhysics", name = "⚙️ FÍSICA LEVE", desc = "Física drasticamente reduzida", func = optimizationFunctions.DisablePhysics.func, default = false},
-    {key = "RemoveSounds", name = "🔇 SEM SONS", desc = "Áudio completamente desativado", func = optimizationFunctions.RemoveSounds.func, default = false},
-    {key = "SimplifyTerrain", name = "🏞️ TERRENO SIMPLES", desc = "Terreno radicalmente otimizado", func = optimizationFunctions.SimplifyTerrain.func, default = false},
-    {key = "RemoveGUIEffects", name = "🖥️ SEM EFEITOS GUI", desc = "Interface completamente limpa", func = optimizationFunctions.RemoveGUIEffects.func, default = false},
-    {key = "LimitPartCount", name = "📦 LIMITAR PARTES", desc = "Quantidade de objetos reduzida", func = optimizationFunctions.LimitPartCount.func, default = false},
-    {key = "OptimizeNetwork", name = "🌐 REDE OTIMIZADA", desc = "Conexão e latência melhoradas", func = optimizationFunctions.OptimizeNetwork.func, default = false},
-    {key = "ReduceShadowMap", name = "🌑 SOMBRAS REDUZIDAS", desc = "Remove sombras do jogo", func = optimizationFunctions.ReduceShadowMap.func, default = false},
-    {key = "EnableAggressiveGC", name = "🧹 GC AGRESSIVO", desc = "Limpeza frequente de memória", func = optimizationFunctions.EnableAggressiveGC.func, default = false},
-    {key = "RemoveWaterEffects", name = "💧 SEM EFEITOS ÁGUA", desc = "Água completamente simplificada", func = optimizationFunctions.RemoveWaterEffects.func, default = false},
-    {key = "SimplifyMaterials", name = "🔷 MATERIAIS SIMPLES", desc = "Todos materiais em plástico", func = optimizationFunctions.SimplifyMaterials.func, default = false},
-    {key = "ReduceQuality", name = "📉 QUALIDADE REDUZIDA", desc = "Qualidade geral radicalmente reduzida", func = optimizationFunctions.ReduceQuality.func, default = false},
-    {key = "OptimizeCharacters", name = "👤 PERSONAGENS OTIMIZADOS", desc = "Reduz detalhes dos personagens", func = optimizationFunctions.OptimizeCharacters.func, default = false},
-    {key = "RemoveLightingEffects", name = "💫 SEM EFEITOS DE LUZ", desc = "Remove efeitos especiais de luz", func = optimizationFunctions.RemoveLightingEffects.func, default = false},
-    {key = "OptimizeTextures", name = "🖌️ TEXTURAS OTIMIZADAS", desc = "Compressão máxima de texturas", func = optimizationFunctions.OptimizeTextures.func, default = false},
-    {key = "ReduceParticleQuality", name = "🎇 PARTÍCULAS MÍNIMAS", desc = "Qualidade mínima de partículas", func = optimizationFunctions.ReduceParticleQuality.func, default = false},
-    {key = "OptimizeRendering", name = "🖥️ RENDERIZAÇÃO OTIMIZADA", desc = "Configurações avançadas de render", func = optimizationFunctions.OptimizeRendering.func, default = false},
-    {key = "MemoryOptimization", name = "💾 OTIMIZAÇÃO DE MEMÓRIA", desc = "Gestão avançada de memória RAM", func = optimizationFunctions.MemoryOptimization.func, default = false}
-}
+    mainScreenGui = Instance.new("ScreenGui")
+    mainScreenGui.Name = "VGZINSK_V1"
+    mainScreenGui.ResetOnSpawn = false
+    mainScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "MainFrame"
+    MainFrame.Size = UDim2.new(0, 400, 0, 600)
+    MainFrame.Position = UDim2.new(0.5, -200, 0.5, -300)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Active = true
+    MainFrame.Draggable = true
+    
+    local OuterGlow = Instance.new("UIStroke")
+    OuterGlow.Thickness = 4
+    OuterGlow.Color = Color3.fromRGB(0, 255, 255)
+    OuterGlow.Transparency = 0.2
+    OuterGlow.Parent = MainFrame
+    
+    local InnerGlow = Instance.new("UIStroke")
+    InnerGlow.Thickness = 2
+    InnerGlow.Color = Color3.fromRGB(255, 0, 255)
+    InnerGlow.Transparency = 0.3
+    InnerGlow.Parent = MainFrame
+    
+    local Header = Instance.new("Frame")
+    Header.Name = "Header"
+    Header.Size = UDim2.new(1, 0, 0, 45)
+    Header.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
+    Header.BorderSizePixel = 0
+    Header.Parent = MainFrame
+    
+    local HeaderGradient = Instance.new("UIGradient")
+    HeaderGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 30, 60)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(60, 0, 60)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 60, 30))
+    })
+    HeaderGradient.Rotation = 45
+    HeaderGradient.Parent = Header
+    
+    local Title = Instance.new("TextLabel")
+    Title.Name = "Title"
+    Title.Size = UDim2.new(0.6, 0, 1, 0)
+    Title.Position = UDim2.new(0, 15, 0, 0)
+    Title.BackgroundTransparency = 1
+    Title.Text = "⚡ VGZINSK V1"
+    Title.TextColor3 = Color3.fromRGB(0, 255, 255)
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.Font = Enum.Font.GothamBlack
+    Title.TextSize = 16
+    Title.TextStrokeTransparency = 0.6
+    Title.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    Title.Parent = Header
+    
+    local MinimizeButton = Instance.new("TextButton")
+    MinimizeButton.Name = "MinimizeButton"
+    MinimizeButton.Size = UDim2.new(0, 35, 0, 35)
+    MinimizeButton.Position = UDim2.new(1, -75, 0, 5)
+    MinimizeButton.BackgroundColor3 = Color3.fromRGB(255, 150, 50)
+    MinimizeButton.BorderSizePixel = 0
+    MinimizeButton.Text = "○"
+    MinimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    MinimizeButton.Font = Enum.Font.GothamBold
+    MinimizeButton.TextSize = 16
+    MinimizeButton.Parent = Header
+    
+    local CloseButton = Instance.new("TextButton")
+    CloseButton.Name = "CloseButton"
+    CloseButton.Size = UDim2.new(0, 35, 0, 35)
+    CloseButton.Position = UDim2.new(1, -35, 0, 5)
+    CloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    CloseButton.BorderSizePixel = 0
+    CloseButton.Text = "X"
+    CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseButton.Font = Enum.Font.GothamBold
+    CloseButton.TextSize = 16
+    CloseButton.Parent = Header
+    
+    local MainContainer = Instance.new("ScrollingFrame")
+    MainContainer.Name = "MainContainer"
+    MainContainer.Size = UDim2.new(1, -15, 1, -60)
+    MainContainer.Position = UDim2.new(0, 7, 0, 50)
+    MainContainer.BackgroundTransparency = 1
+    MainContainer.BorderSizePixel = 0
+    MainContainer.ScrollBarThickness = 8
+    MainContainer.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 255)
+    MainContainer.ScrollBarImageTransparency = 0.5
+    MainContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+    MainContainer.Parent = MainFrame
+    
+    -- Adicionar performance display
+    local perfDisplay = CreatePerformanceDisplay()
+    perfDisplay.Parent = MainContainer
+    
+    local currentY = 50
+    
+    -- Função para criar toggles
+    local function CreateCyberToggle(name, description, defaultState, callback, settingKey)
+        local ToggleFrame = Instance.new("Frame")
+        ToggleFrame.Size = UDim2.new(1, 0, 0, 50)
+        ToggleFrame.BackgroundTransparency = 1
+        ToggleFrame.BorderSizePixel = 0
+        
+        local ToggleBG = Instance.new("Frame")
+        ToggleBG.Size = UDim2.new(1, 0, 1, 0)
+        ToggleBG.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+        ToggleBG.BorderSizePixel = 0
+        ToggleBG.Parent = ToggleFrame
+        
+        local ToggleGradient = Instance.new("UIGradient")
+        ToggleGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(35, 35, 55)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 25, 40))
+        })
+        ToggleGradient.Parent = ToggleBG
+        
+        local ToggleStroke = Instance.new("UIStroke")
+        ToggleStroke.Thickness = 1
+        ToggleStroke.Color = Color3.fromRGB(60, 60, 80)
+        ToggleStroke.Parent = ToggleBG
+        
+        local Icon = Instance.new("TextLabel")
+        Icon.Size = UDim2.new(0, 30, 0, 30)
+        Icon.Position = UDim2.new(0, 8, 0, 10)
+        Icon.BackgroundTransparency = 1
+        Icon.Text = "🔧"
+        Icon.TextColor3 = Color3.fromRGB(0, 255, 255)
+        Icon.Font = Enum.Font.GothamBold
+        Icon.TextSize = 16
+        Icon.Parent = ToggleFrame
+        
+        local ToggleLabel = Instance.new("TextLabel")
+        ToggleLabel.Size = UDim2.new(0.6, 0, 0.5, 0)
+        ToggleLabel.Position = UDim2.new(0, 45, 0, 5)
+        ToggleLabel.BackgroundTransparency = 1
+        ToggleLabel.Text = name
+        ToggleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        ToggleLabel.TextXAlignment = Enum.TextXAlignment.Left
+        ToggleLabel.Font = Enum.Font.GothamBold
+        ToggleLabel.TextSize = 13
+        ToggleLabel.Parent = ToggleFrame
+        
+        local DescriptionLabel = Instance.new("TextLabel")
+        DescriptionLabel.Size = UDim2.new(0.6, 0, 0.5, 0)
+        DescriptionLabel.Position = UDim2.new(0, 45, 0.5, 0)
+        DescriptionLabel.BackgroundTransparency = 1
+        DescriptionLabel.Text = description
+        DescriptionLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
+        DescriptionLabel.TextXAlignment = Enum.TextXAlignment.Left
+        DescriptionLabel.Font = Enum.Font.Gotham
+        DescriptionLabel.TextSize = 10
+        DescriptionLabel.Parent = ToggleFrame
+        
+        local ToggleButton = Instance.new("TextButton")
+        ToggleButton.Size = UDim2.new(0, 50, 0, 25)
+        ToggleButton.Position = UDim2.new(1, -60, 0.5, -12)
+        ToggleButton.BackgroundColor3 = defaultState and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(60, 60, 80)
+        ToggleButton.BorderSizePixel = 0
+        ToggleButton.Text = ""
+        ToggleButton.AutoButtonColor = false
+        ToggleButton.Parent = ToggleFrame
+        
+        local ToggleButtonStroke = Instance.new("UIStroke")
+        ToggleButtonStroke.Thickness = 2
+        ToggleButtonStroke.Color = Color3.fromRGB(100, 100, 120)
+        ToggleButtonStroke.Parent = ToggleButton
+        
+        local ToggleKnob = Instance.new("Frame")
+        ToggleKnob.Size = UDim2.new(0, 21, 0, 21)
+        ToggleKnob.Position = defaultState and UDim2.new(1, -23, 0.5, -10) or UDim2.new(0, 2, 0.5, -10)
+        ToggleKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        ToggleKnob.BorderSizePixel = 0
+        ToggleKnob.Parent = ToggleButton
+        
+        local KnobGradient = Instance.new("UIGradient")
+        KnobGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(220, 220, 220))
+        })
+        KnobGradient.Parent = ToggleKnob
+        
+        local isEnabled = defaultState
+        
+        if isEnabled then
+            pcall(callback, true)
+            savedSettings[settingKey] = true
+        end
+        
+        ToggleButton.MouseEnter:Connect(function()
+            if isEnabled then
+                TweenService:Create(ToggleButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 230, 0)}):Play()
+            else
+                TweenService:Create(ToggleButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(80, 80, 100)}):Play()
+            end
+        end)
+        
+        ToggleButton.MouseLeave:Connect(function()
+            if isEnabled then
+                TweenService:Create(ToggleButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 200, 0)}):Play()
+            else
+                TweenService:Create(ToggleButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60, 60, 80)}):Play()
+            end
+        end)
+        
+        ToggleButton.MouseButton1Click:Connect(function()
+            isEnabled = not isEnabled
+            
+            if isEnabled then
+                TweenService:Create(ToggleButton, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(0, 200, 0)}):Play()
+                TweenService:Create(ToggleKnob, TweenInfo.new(0.3), {Position = UDim2.new(1, -23, 0.5, -10)}):Play()
+            else
+                TweenService:Create(ToggleButton, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(60, 60, 80)}):Play()
+                TweenService:Create(ToggleKnob, TweenInfo.new(0.3), {Position = UDim2.new(0, 2, 0.5, -10)}):Play()
+            end
+            
+            pcall(callback, isEnabled)
+            
+            savedSettings[settingKey] = isEnabled
+            SaveSettings()
+        end)
+        
+        return ToggleFrame
+    end
 
-for i, toggleData in ipairs(functionToggles) do
-    local toggle = CreateCyberToggle(
-        toggleData.name,
-        toggleData.desc,
-        toggleData.default,
-        toggleData.func,
-        toggleData.key
-    )
-    toggle.Position = UDim2.new(0, 0, 0, currentY)
-    toggle.Parent = MainContainer
-    currentY = currentY + 55
+    -- Lista de toggles (24 funções + 4 principais)
+    local functionToggles = {
+        {key = "autoLoad", name = "🔄 AUTO LOAD", desc = "Carrega configurações automaticamente", func = ToggleAutoLoad, default = false},
+        {key = "platformBuilder", name = "🏗️ PLATFORM BUILDER", desc = "Cria plataformas ao pular", func = TogglePlatformBuilder, default = false},
+        {key = "wallhack", name = "👻 WALLHACK FIXED", desc = "Atravessa paredes mas não o chão", func = ToggleWallhack, default = false},
+        {key = "teleport", name = "💫 TELEPORT SYSTEM V2", desc = "Sistema de teletransporte avançado", func = ToggleTeleport, default = false},
+        
+        -- 24 funções de otimização
+        {key = "RemoveCharacterAnimations", name = "🎭 SEM ANIMAÇÕES", desc = "Remove movimentos do personagem", func = optimizationFunctions.RemoveCharacterAnimations.func, default = false},
+        {key = "OptimizeLighting", name = "💡 LUZ OTIMIZADA", desc = "Iluminação mínima avançada", func = optimizationFunctions.OptimizeLighting.func, default = false},
+        {key = "RemoveAllSkins", name = "⚫ SKINS PRETAS", desc = "Todos players completamente pretos", func = optimizationFunctions.RemoveAllSkins.func, default = false},
+        {key = "ReduceRenderDistance", name = "👁️ RENDER REDUZIDO", desc = "Distância de renderização mínima", func = optimizationFunctions.ReduceRenderDistance.func, default = false},
+        {key = "RemoveParticles", name = "✨ SEM PARTÍCULAS", desc = "Remove efeitos visuais", func = optimizationFunctions.RemoveParticles.func, default = false},
+        {key = "RemoveTextures", name = "🖼️ SEM TEXTURAS", desc = "Texturas completamente removidas", func = optimizationFunctions.RemoveTextures.func, default = false},
+        {key = "OptimizeGraphics", name = "🎮 GRÁFICOS MÍNIMOS", desc = "Configurações gráficas no mínimo", func = optimizationFunctions.OptimizeGraphics.func, default = false},
+        {key = "DisablePhysics", name = "⚙️ FÍSICA LEVE", desc = "Física drasticamente reduzida", func = optimizationFunctions.DisablePhysics.func, default = false},
+        {key = "RemoveSounds", name = "🔇 SEM SONS", desc = "Áudio completamente desativado", func = optimizationFunctions.RemoveSounds.func, default = false},
+        {key = "SimplifyTerrain", name = "🏞️ TERRENO SIMPLES", desc = "Terreno radicalmente otimizado", func = optimizationFunctions.SimplifyTerrain.func, default = false},
+        {key = "RemoveGUIEffects", name = "🖥️ SEM EFEITOS GUI", desc = "Interface completamente limpa", func = optimizationFunctions.RemoveGUIEffects.func, default = false},
+        {key = "LimitPartCount", name = "📦 LIMITAR PARTES", desc = "Quantidade de objetos reduzida", func = optimizationFunctions.LimitPartCount.func, default = false},
+        {key = "OptimizeNetwork", name = "🌐 REDE OTIMIZADA", desc = "Conexão e latência melhoradas", func = optimizationFunctions.OptimizeNetwork.func, default = false},
+        {key = "ReduceShadowMap", name = "🌑 SOMBRAS REDUZIDAS", desc = "Remove sombras do jogo", func = optimizationFunctions.ReduceShadowMap.func, default = false},
+        {key = "EnableAggressiveGC", name = "🧹 GC AGRESSIVO", desc = "Limpeza frequente de memória", func = optimizationFunctions.EnableAggressiveGC.func, default = false},
+        {key = "RemoveWaterEffects", name = "💧 SEM EFEITOS ÁGUA", desc = "Água completamente simplificada", func = optimizationFunctions.RemoveWaterEffects.func, default = false},
+        {key = "SimplifyMaterials", name = "🔷 MATERIAIS SIMPLES", desc = "Todos materiais em plástico", func = optimizationFunctions.SimplifyMaterials.func, default = false},
+        {key = "OptimizeCharacters", name = "👤 PERSONAGENS OTIMIZADOS", desc = "Reduz detalhes dos personagens", func = optimizationFunctions.OptimizeCharacters.func, default = false},
+        {key = "RemoveLightingEffects", name = "💫 SEM EFEITOS DE LUZ", desc = "Remove efeitos especiais de luz", func = optimizationFunctions.RemoveLightingEffects.func, default = false},
+        {key = "OptimizeTextures", name = "🖌️ TEXTURAS OTIMIZADAS", desc = "Compressão máxima de texturas", func = optimizationFunctions.OptimizeTextures.func, default = false},
+        {key = "ReduceParticleQuality", name = "🎇 PARTÍCULAS MÍNIMAS", desc = "Qualidade mínima de partículas", func = optimizationFunctions.ReduceParticleQuality.func, default = false},
+        {key = "OptimizeRendering", name = "🖥️ RENDERIZAÇÃO OTIMIZADA", desc = "Configurações avançadas de render", func = optimizationFunctions.OptimizeRendering.func, default = false},
+        {key = "MemoryOptimization", name = "💾 OTIMIZAÇÃO DE MEMÓRIA", desc = "Gestão avançada de memória RAM", func = optimizationFunctions.MemoryOptimization.func, default = false},
+        {key = "AdvancedFPSBoost", name = "🚀 BOOST DE FPS", desc = "Otimização extrema para máximo FPS", func = optimizationFunctions.AdvancedFPSBoost.func, default = false}
+    }
+
+    -- Adicionar todos os toggles
+    for i, toggleData in ipairs(functionToggles) do
+        local toggle = CreateCyberToggle(
+            toggleData.name,
+            toggleData.desc,
+            toggleData.default,
+            toggleData.func,
+            toggleData.key
+        )
+        toggle.Position = UDim2.new(0, 0, 0, currentY)
+        toggle.Parent = MainContainer
+        currentY = currentY + 55
+    end
+
+    -- Botão de reset
+    local resetFrame = Instance.new("Frame")
+    resetFrame.Size = UDim2.new(1, 0, 0, 45)
+    resetFrame.BackgroundTransparency = 1
+    resetFrame.Position = UDim2.new(0, 0, 0, currentY)
+    resetFrame.Parent = MainContainer
+
+    local resetButton = Instance.new("TextButton")
+    resetButton.Size = UDim2.new(1, 0, 1, 0)
+    resetButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    resetButton.BorderSizePixel = 0
+    resetButton.Text = "🔄 RESETAR TUDO"
+    resetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    resetButton.Font = Enum.Font.GothamBold
+    resetButton.TextSize = 14
+    resetButton.Parent = resetFrame
+
+    resetButton.MouseButton1Click:Connect(function()
+        for _, toggleData in ipairs(functionToggles) do
+            if savedSettings[toggleData.key] then
+                pcall(toggleData.func, false)
+                savedSettings[toggleData.key] = false
+            end
+        end
+        SaveSettings()
+    end)
+
+    currentY = currentY + 50
+    MainContainer.CanvasSize = UDim2.new(0, 0, 0, currentY + 20)
+
+    -- Configurar botões
+    MinimizeButton.MouseButton1Click:Connect(function()
+        MinimizeMainGUI()
+    end)
+
+    CloseButton.MouseButton1Click:Connect(function()
+        mainScreenGui:Destroy()
+        if mainBubble then
+            mainBubble:Destroy()
+        end
+    end)
+
+    MainFrame.Parent = mainScreenGui
+    mainScreenGui.Parent = playerGui
+
+    return mainScreenGui
 end
 
--- BOTÃO DE RESET AVANÇADO
-local resetFrame = Instance.new("Frame")
-resetFrame.Size = UDim2.new(1, 0, 0, 45)
-resetFrame.BackgroundTransparency = 1
-resetFrame.Position = UDim2.new(0, 0, 0, currentY)
-resetFrame.Parent = MainContainer
-
-local resetButton = Instance.new("TextButton")
-resetButton.Size = UDim2.new(1, 0, 1, 0)
-resetButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-resetButton.BorderSizePixel = 0
-resetButton.Text = "🔄 RESETAR TUDO"
-resetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-resetButton.Font = Enum.Font.GothamBold
-resetButton.TextSize = 14
-resetButton.Parent = resetFrame
-
-resetButton.MouseButton1Click:Connect(function()
-    for _, toggleData in ipairs(functionToggles) do
-        if savedSettings[toggleData.key] then
-            pcall(toggleData.func, false)
-            savedSettings[toggleData.key] = false
-        end
-    end
-    
-    if platformBuilderEnabled then
-        TogglePlatformBuilder(false)
-    end
-    
-    if wallhackEnabled then
-        ToggleWallhack(false)
-    end
-    
-    if teleportEnabled then
-        ToggleTeleport(false)
-    end
-    
-    SaveSettings()
-end)
-
-currentY = currentY + 50
-MainContainer.CanvasSize = UDim2.new(0, 0, 0, currentY + 20)
-
--- MONTAR A INTERFACE
-Header.Parent = MainFrame
-MainContainer.Parent = MainFrame
-MainFrame.Parent = ScreenGui
-ScreenGui.Parent = playerGui
-
--- ANIMAÇÕES
+-- ANIMAÇÕES GLOBAIS
 coroutine.wrap(function()
     while true do
         local time = tick()
-        OuterGlow.Color = Color3.fromHSV((time * 0.3) % 1, 0.9, 1)
-        InnerGlow.Color = Color3.fromHSV((time * 0.3 + 0.5) % 1, 0.9, 1)
-        wait(0.08)
+        if mainScreenGui and mainScreenGui.Enabled then
+            -- Animação das cores do título
+            TweenService:Create(Title, TweenInfo.new(2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
+                TextColor3 = Color3.fromHSV((time * 0.2) % 1, 0.8, 1)
+            }):Play()
+        end
+        wait(0.1)
     end
 end)()
 
+-- INICIALIZAÇÃO DO SISTEMA
 coroutine.wrap(function()
-    while true do
-        TweenService:Create(Title, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
-            TextColor3 = Color3.fromRGB(255, 0, 255),
-            TextStrokeTransparency = 0.4
-        }):Play()
-        wait(1.5)
-        TweenService:Create(Title, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
-            TextColor3 = Color3.fromRGB(0, 255, 255),
-            TextStrokeTransparency = 0.6
-        }):Play()
-        wait(1.5)
-    end
-end)()
-
--- BOTÕES DA INTERFACE
-MinimizeButton.MouseButton1Click:Connect(function()
-    local isMinimized = MainContainer.Visible
-    if isMinimized then
-        TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-            Size = UDim2.new(0, 380, 0, 45),
-            Position = UDim2.new(0.5, -190, 1, -50)
-        }):Play()
-        MainContainer.Visible = false
-    else
-        MainContainer.Visible = true
-        TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Size = UDim2.new(0, 380, 0, 550),
-            Position = UDim2.new(0.5, -190, 0.5, -275)
-        }):Play()
-    end
-end)
-
-CloseButton.MouseButton1Click:Connect(function()
-    TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-        Size = UDim2.new(0, 0, 0, 0),
-        Position = UDim2.new(0.5, 0, 0.5, 0),
-        Rotation = 360
-    }):Play()
+    wait(1)
     
-    TweenService:Create(OuterGlow, TweenInfo.new(0.5), {
-        Transparency = 1
-    }):Play()
+    -- Criar interface principal
+    CreateMainGUI()
     
-    TweenService:Create(InnerGlow, TweenInfo.new(0.5), {
-        Transparency = 1
-    }):Play()
+    -- Inicializar sistemas
+    InitializeStableFPS()
+    InitializeAdvancedPerformanceMonitor()
     
-    wait(0.5)
-    ScreenGui:Destroy()
-    
-    -- LIMPAR TODAS AS CONEXÕES
-    for _, conn in pairs(connections) do
-        if conn then
-            conn:Disconnect()
+    -- Carregar configurações
+    local loadedData = LoadSettings()
+    if loadedData then
+        if loadedData.autoLoad then
+            ToggleAutoLoad(true)
         end
     end
     
-    -- LIMPAR WALLHACK CONNECTIONS
-    for _, conn in pairs(wallhackConnections) do
-        if conn then
-            conn:Disconnect()
-        end
-    end
-end)
-
--- ========== INICIALIZAÇÃO DO SISTEMA COMPLETO ==========
-
--- INICIALIZAR FPS ESTÁVEL
-InitializeStableFPS()
-
--- INICIALIZAR MONITOR DE PERFORMANCE
-InitializeAdvancedPerformanceMonitor()
-
--- CARREGAR CONFIGURAÇÕES INICIAIS
-local loadedData = LoadSettings()
-if loadedData then
-    if loadedData.autoLoad then
-        ToggleAutoLoad(true)
-    end
-end
-
--- SISTEMA DE PROTEÇÃO CONTRA CRASHES AVANÇADO
-localPlayer.CharacterAdded:Connect(function(character)
-    wait(2)
-    
-    -- REAPLICAR CONFIGURAÇÕES SE NECESSÁRIO
-    if autoLoadEnabled then
-        for settingKey, isEnabled in pairs(savedSettings) do
-            if isEnabled then
-                if settingKey == "platformBuilder" then
-                    TogglePlatformBuilder(true)
-                elseif settingKey == "wallhack" then
-                    ToggleWallhack(true)
-                elseif settingKey == "teleport" then
-                    ToggleTeleport(true)
-                elseif optimizationFunctions[settingKey] then
-                    pcall(optimizationFunctions[settingKey].func, true)
+    -- Sistema de proteção
+    localPlayer.CharacterAdded:Connect(function(character)
+        wait(2)
+        if autoLoadEnabled then
+            for settingKey, isEnabled in pairs(savedSettings) do
+                if isEnabled then
+                    if settingKey == "platformBuilder" then
+                        TogglePlatformBuilder(true)
+                    elseif settingKey == "wallhack" then
+                        ToggleWallhack(true)
+                    elseif settingKey == "teleport" then
+                        ToggleTeleport(true)
+                    elseif optimizationFunctions[settingKey] then
+                        pcall(optimizationFunctions[settingKey].func, true)
+                    end
                 end
             end
         end
-    end
-end)
-
--- SISTEMA DE AUTO-SAVE
-coroutine.wrap(function()
-    while true do
-        wait(30) -- Salvar a cada 30 segundos
-        if autoLoadEnabled then
-            SaveSettings()
-        end
-    end
-end)()
-
--- VERIFICAÇÃO FINAL
-coroutine.wrap(function()
-    wait(5)
-    local totalFunctions = 0
-    for _ in pairs(optimizationFunctions) do
-        totalFunctions = totalFunctions + 1
-    end
+    end)
     
-    print("🔍 VERIFICAÇÃO DE INTEGRIDADE:")
-    print("📊 Funções carregadas: " .. totalFunctions .. "/25")
-    print("💾 Sistema de salvamento: ✅")
-    print("🎮 Performance: ✅")
-    print("🛡️ Segurança: ✅")
-    print("⚡ VGZINSK V1 - CARREGADO COM SUCESSO!")
+    -- Auto-save
+    coroutine.wrap(function()
+        while true do
+            wait(30)
+            if autoLoadEnabled then
+                SaveSettings()
+            end
+        end
+    end)()
+    
+    print("⚡ VGZINSK V1 - SISTEMA COMPLETO INICIALIZADO!")
+    print("📊 Performance monitor: ✅ FUNCIONANDO")
+    print("🎯 24 Funções de otimização: ✅ ATIVAS")
+    print("🔧 Sistema de bolha: ✅ IMPLEMENTADO")
+    print("🛡️ Wallhack corrigido: ✅ FUNCIONAL")
+    print("💫 Teleport V2: ✅ OPERACIONAL")
 end)()
-
-return {
-    Version = "VGZINSK V1",
-    Features = 25,
-    Status = "ACTIVE"
-}
