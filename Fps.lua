@@ -9,7 +9,6 @@ local CoreGui = game:GetService("CoreGui")
 local Stats = game:GetService("Stats")
 local TeleportService = game:GetService("TeleportService")
 
--- CONFIGURAÇÕES PRINCIPAIS AVANÇADAS
 local localPlayer = Players.LocalPlayer
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 local targetFPS = 60
@@ -26,23 +25,19 @@ local performanceStats = {
     objects = 0
 }
 
--- SISTEMA DE PLATFORM BUILDER
 local platformParts = {}
 local maxPlatforms = 50
 local platformLifetime = 30
 local currentPlatformCount = 0
 
--- SISTEMA DE WALLHACK
 local originalCollisions = {}
 local wallhackConnections = {}
 
--- SISTEMA DE TELEPORT
 local teleportPoints = {}
 local currentTeleportPoint = nil
 local teleportGui = nil
 
--- SISTEMA DE SALVAMENTO AVANÇADO
-local DATA_KEY = "VGZINSK_V4_ULTIMATE_SETTINGS"
+local DATA_KEY = "VGZINSK V1"
 
 local function DeepCopy(table)
     local copy = {}
@@ -88,7 +83,6 @@ local function LoadSettings()
     return nil
 end
 
--- SISTEMA DE FPS ESTÁVEL EM 60 FPS AVANÇADO
 local function InitializeStableFPS()
     if connections.fpsControl then
         connections.fpsControl:Disconnect()
@@ -101,7 +95,6 @@ local function InitializeStableFPS()
         local endTime = tick()
         local actualFrameTime = endTime - startTime
         
-        -- Ajuste dinâmico para manter 60 FPS
         if actualFrameTime > frameTime * 1.1 then
             settings().Rendering.QualityLevel = math.max(1, settings().Rendering.QualityLevel - 1)
         elseif actualFrameTime < frameTime * 0.9 then
@@ -123,7 +116,7 @@ local function InitializeAdvancedPerformanceMonitor()
     end
     
     connections.performanceMonitor = RunService.Heartbeat:Connect(function()
-        -- Monitorar FPS com média móvel
+            
         local currentFPS = math.floor(1 / RunService.RenderStepped:Wait())
         performanceStats.fps = currentFPS
         
@@ -875,11 +868,31 @@ local optimizationFunctions = {
             end
         end
     },
-    
-    OptimizeCharacters = {
-        name = "Personagens Otimizados",
-        desc = "Reduz drasticamente detalhes dos personagens",
-        func = function(state)
+
+OptimizeCharacters = {
+    name = "Personagens Otimizados",
+    desc = "Reduz drasticamente detalhes dos personagens",
+    func = function(state)
+        if state then
+            for _, player in pairs(Players:GetPlayers()) do
+                if player.Character then
+                    for _, part in pairs(player.Character:GetDescendants()) do
+                        if part:IsA("Part") or part:IsA("MeshPart") then
+                            part.Material = Enum.Material.Plastic
+                            part.Reflectance = 0
+                        end
+                    end
+                end
+                player.CharacterAdded:Connect(function(character)
+                    wait(1)
+                    for _, part in pairs(character:GetDescendants()) do
+                        if part:IsA("Part") or part:IsA("MeshPart") then
+                            part.Material = Enum.Material.Plastic
+                            part.Reflectance = 0
+                        end
+                    end
+                end
+            end
         end
     },
     
@@ -967,12 +980,6 @@ ScreenGui.Name = "VGZINSK V1"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "VGZINSK V1"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
--- FRAME PRINCIPAL COM DESIGN CYBERPUNK AVANÇADO
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 380, 0, 550)
@@ -982,7 +989,6 @@ MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
 
--- EFEITOS DE BORDA CYBERPUNK AVANÇADOS
 local OuterGlow = Instance.new("UIStroke")
 OuterGlow.Thickness = 4
 OuterGlow.Color = Color3.fromRGB(0, 255, 255)
@@ -1004,7 +1010,6 @@ CyberPattern.ScaleType = Enum.ScaleType.Tile
 CyberPattern.TileSize = UDim2.new(0, 50, 0, 50)
 CyberPattern.Parent = MainFrame
 
--- HEADER CYBERPUNK COM EFEITOS AVANÇADOS
 local Header = Instance.new("Frame")
 Header.Name = "Header"
 Header.Size = UDim2.new(1, 0, 0, 45)
@@ -1025,7 +1030,7 @@ Title.Name = "Title"
 Title.Size = UDim2.new(0.7, 0, 1, 0)
 Title.Position = UDim2.new(0, 15, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "⚡ VGZINSK V4 - CYBERPUNK 2099"
+Title.Text = "⚡ VGZINSK V1"
 Title.TextColor3 = Color3.fromRGB(0, 255, 255)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Font = Enum.Font.GothamBlack
@@ -1033,7 +1038,6 @@ Title.TextSize = 16
 Title.TextStrokeTransparency = 0.6
 Title.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 
--- BOTÕES HEADER AVANÇADOS
 local MinimizeButton = Instance.new("TextButton")
 MinimizeButton.Name = "MinimizeButton"
 MinimizeButton.Size = UDim2.new(0, 35, 0, 35)
@@ -1056,7 +1060,6 @@ CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 CloseButton.Font = Enum.Font.GothamBold
 CloseButton.TextSize = 16
 
--- CONTAINER PRINCIPAL AVANÇADO
 local MainContainer = Instance.new("ScrollingFrame")
 MainContainer.Name = "MainContainer"
 MainContainer.Size = UDim2.new(1, -15, 1, -60)
@@ -1068,14 +1071,12 @@ MainContainer.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 255)
 MainContainer.ScrollBarImageTransparency = 0.5
 MainContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
 
--- SISTEMA DE TOGGLES CYBERPUNK AVANÇADO
 local function CreateCyberToggle(name, description, defaultState, callback, settingKey)
     local ToggleFrame = Instance.new("Frame")
     ToggleFrame.Size = UDim2.new(1, 0, 0, 50)
     ToggleFrame.BackgroundTransparency = 1
     ToggleFrame.BorderSizePixel = 0
     
-    -- BACKGROUND COM GRADIENTE E EFEITOS
     local ToggleBG = Instance.new("Frame")
     ToggleBG.Size = UDim2.new(1, 0, 1, 0)
     ToggleBG.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
@@ -1094,7 +1095,6 @@ local function CreateCyberToggle(name, description, defaultState, callback, sett
     ToggleStroke.Color = Color3.fromRGB(60, 60, 80)
     ToggleStroke.Parent = ToggleBG
     
-    -- ÍCONE CYBERPUNK
     local Icon = Instance.new("TextLabel")
     Icon.Size = UDim2.new(0, 30, 0, 30)
     Icon.Position = UDim2.new(0, 8, 0, 10)
@@ -1105,7 +1105,6 @@ local function CreateCyberToggle(name, description, defaultState, callback, sett
     Icon.TextSize = 16
     Icon.Parent = ToggleFrame
     
-    -- LABELS
     local ToggleLabel = Instance.new("TextLabel")
     ToggleLabel.Size = UDim2.new(0.6, 0, 0.5, 0)
     ToggleLabel.Position = UDim2.new(0, 45, 0, 5)
@@ -1128,7 +1127,6 @@ local function CreateCyberToggle(name, description, defaultState, callback, sett
     DescriptionLabel.TextSize = 10
     DescriptionLabel.Parent = ToggleFrame
     
-    -- BOTÃO TOGGLE AVANÇADO
     local ToggleButton = Instance.new("TextButton")
     ToggleButton.Size = UDim2.new(0, 50, 0, 25)
     ToggleButton.Position = UDim2.new(1, -60, 0.5, -12)
@@ -1143,7 +1141,6 @@ local function CreateCyberToggle(name, description, defaultState, callback, sett
     ToggleButtonStroke.Color = Color3.fromRGB(100, 100, 120)
     ToggleButtonStroke.Parent = ToggleButton
     
-    -- KNOB DO TOGGLE
     local ToggleKnob = Instance.new("Frame")
     ToggleKnob.Size = UDim2.new(0, 21, 0, 21)
     ToggleKnob.Position = defaultState and UDim2.new(1, -23, 0.5, -10) or UDim2.new(0, 2, 0.5, -10)
@@ -1160,13 +1157,11 @@ local function CreateCyberToggle(name, description, defaultState, callback, sett
     
     local isEnabled = defaultState
     
-    -- APLICAR ESTADO INICIAL
     if isEnabled then
         callback(true)
         savedSettings[settingKey] = true
     end
     
-    -- SISTEMA DE HOVER EFFECTS
     ToggleButton.MouseEnter:Connect(function()
         if isEnabled then
             TweenService:Create(ToggleButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 230, 0)}):Play()
@@ -1183,11 +1178,9 @@ local function CreateCyberToggle(name, description, defaultState, callback, sett
         end
     end)
     
-    -- CLICK FUNCTIONALITY
     ToggleButton.MouseButton1Click:Connect(function()
         isEnabled = not isEnabled
         
-        -- ANIMAÇÃO SUAVE
         if isEnabled then
             TweenService:Create(ToggleButton, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(0, 200, 0)}):Play()
             TweenService:Create(ToggleKnob, TweenInfo.new(0.3), {Position = UDim2.new(1, -23, 0.5, -10)}):Play()
@@ -1196,10 +1189,8 @@ local function CreateCyberToggle(name, description, defaultState, callback, sett
             TweenService:Create(ToggleKnob, TweenInfo.new(0.3), {Position = UDim2.new(0, 2, 0.5, -10)}):Play()
         end
         
-        -- EXECUTAR FUNÇÃO
         callback(isEnabled)
         
-        -- SALVAR CONFIGURAÇÃO
         savedSettings[settingKey] = isEnabled
         SaveSettings()
     end)
@@ -1207,7 +1198,6 @@ local function CreateCyberToggle(name, description, defaultState, callback, sett
     return ToggleFrame
 end
 
--- SISTEMA DE PERFORMANCE DISPLAY
 local function CreatePerformanceDisplay()
     local perfFrame = Instance.new("Frame")
     perfFrame.Size = UDim2.new(1, 0, 0, 40)
@@ -1251,13 +1241,11 @@ local function CreatePerformanceDisplay()
     objectsLabel.TextSize = 12
     objectsLabel.Parent = perfFrame
     
-    -- ATUALIZAR PERFORMANCE
     connections.performanceDisplay = RunService.Heartbeat:Connect(function()
         fpsLabel.Text = "FPS: " .. performanceStats.fps
         memoryLabel.Text = "RAM: " .. performanceStats.memory .. "MB"
         objectsLabel.Text = "OBJ: " .. performanceStats.objects
         
-        -- CORES DINÂMICAS BASEADAS NA PERFORMANCE
         if performanceStats.fps >= 50 then
             fpsLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
         elseif performanceStats.fps >= 30 then
@@ -1278,19 +1266,16 @@ local function CreatePerformanceDisplay()
     return perfFrame
 end
 
--- ========== CONFIGURAR INTERFACE COMPLETA ==========
 
 local currentY = 0
 
--- ADICIONAR DISPLAY DE PERFORMANCE
 local perfDisplay = CreatePerformanceDisplay()
 perfDisplay.Position = UDim2.new(0, 0, 0, currentY)
 perfDisplay.Parent = MainContainer
 currentY = currentY + 45
 
--- ADICIONAR TODAS AS 25+ FUNÇÕES
 local functionToggles = {
-    -- SISTEMAS PRINCIPAIS
+    
     {key = "autoLoad", name = "🔄 AUTO LOAD", desc = "Carrega configurações automaticamente", func = ToggleAutoLoad, default = false},
     {key = "platformBuilder", name = "🏗️ PLATFORM BUILDER", desc = "Cria plataformas ao pular", func = TogglePlatformBuilder, default = false},
     {key = "wallhack", name = "👻 WALLHACK", desc = "Atravessar paredes sem colisão", func = ToggleWallhack, default = false},
@@ -1322,7 +1307,6 @@ local functionToggles = {
     {key = "MemoryOptimization", name = "💾 OTIMIZAÇÃO DE MEMÓRIA", desc = "Gestão avançada de memória RAM", func = optimizationFunctions.MemoryOptimization.func, default = false}
 }
 
--- ADICIONAR TODOS OS TOGGLES À INTERFACE
 for i, toggleData in ipairs(functionToggles) do
     local toggle = CreateCyberToggle(
         toggleData.name,
@@ -1354,7 +1338,7 @@ resetButton.TextSize = 14
 resetButton.Parent = resetFrame
 
 resetButton.MouseButton1Click:Connect(function()
-    -- DESATIVAR TODAS AS FUNÇÕES
+        
     for _, toggleData in ipairs(functionToggles) do
         if savedSettings[toggleData.key] then
             toggleData.func(false)
@@ -1362,17 +1346,14 @@ resetButton.MouseButton1Click:Connect(function()
         end
     end
     
-    -- LIMPAR PLATAFORMAS
     if platformBuilderEnabled then
         TogglePlatformBuilder(false)
     end
     
-    -- RESTAURAR WALLHACK
     if wallhackEnabled then
         ToggleWallhack(false)
     end
     
-    -- FECHAR TELEPORT
     if teleportEnabled then
         ToggleTeleport(false)
     end
@@ -1382,10 +1363,7 @@ end)
 
 currentY = currentY + 50
 
--- AJUSTAR TAMANHO DO CONTAINER
 MainContainer.CanvasSize = UDim2.new(0, 0, 0, currentY + 20)
-
--- ========== MONTAR INTERFACE COMPLETA ==========
 
 Header.Parent = MainFrame
 Title.Parent = Header
@@ -1395,9 +1373,6 @@ MainContainer.Parent = MainFrame
 MainFrame.Parent = ScreenGui
 ScreenGui.Parent = playerGui
 
--- ========== EFEITOS CYBERPUNK 2099 AVANÇADOS ==========
-
--- ANIMAÇÃO DAS BORDAS
 spawn(function()
     while true do
         local time = tick()
@@ -1407,7 +1382,6 @@ spawn(function()
     end
 end)
 
--- EFEITO DE PULSO NO HEADER
 spawn(function()
     while true do
         TweenService:Create(Title, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
@@ -1423,7 +1397,6 @@ spawn(function()
     end
 end)
 
--- EFEITO DE SCAN LINE
 local scanLine = Instance.new("Frame")
 scanLine.Size = UDim2.new(1, 0, 0, 2)
 scanLine.Position = UDim2.new(0, 0, 0, 0)
@@ -1442,8 +1415,6 @@ spawn(function()
         wait(0.5)
     end
 end)
-
--- ========== SISTEMA DE JANELA AVANÇADO ==========
 
 local isMinimized = false
 local originalSize = MainFrame.Size
@@ -1467,7 +1438,6 @@ MinimizeButton.MouseButton1Click:Connect(function()
 end)
 
 CloseButton.MouseButton1Click:Connect(function()
-    -- ANIMAÇÃO DE FECHAMENTO ESPECTACULAR
     TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
         Size = UDim2.new(0, 0, 0, 0),
         Position = UDim2.new(0.5, 0, 0.5, 0),
@@ -1566,4 +1536,4 @@ end)
 return {
     Version = "VGZINSK V1",
     Features = 25,
-    Status = "ACTIVE"}
+    Status = "ACTIVE" }
