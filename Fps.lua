@@ -37,7 +37,33 @@ local teleportPoints = {}
 local currentTeleportPoint = nil
 local teleportGui = nil
 
-local DATA_KEY = "VGZINSK V1"
+local DATA_KEY = "VGZINSK_V1"
+
+-- Sistema de arquivos alternativo para Delta Executor
+local function WriteFile(filename, content)
+    if writefile then
+        return writefile(filename, content)
+    else
+        savedSettings[filename] = content
+        return true
+    end
+end
+
+local function ReadFile(filename)
+    if readfile then
+        return readfile(filename)
+    else
+        return savedSettings[filename]
+    end
+end
+
+local function FileExists(filename)
+    if isfile then
+        return isfile(filename)
+    else
+        return savedSettings[filename] ~= nil
+    end
+end
 
 local function DeepCopy(table)
     local copy = {}
@@ -62,7 +88,7 @@ local function SaveSettings()
             teleportPoints = DeepCopy(teleportPoints),
             currentTeleportPoint = currentTeleportPoint
         }
-        writefile(DATA_KEY, HttpService:JSONEncode(dataToSave))
+        WriteFile(DATA_KEY, HttpService:JSONEncode(dataToSave))
         return true
     end)
     return success
@@ -70,8 +96,8 @@ end
 
 local function LoadSettings()
     local success, result = pcall(function()
-        if isfile(DATA_KEY) then
-            local data = readfile(DATA_KEY)
+        if FileExists(DATA_KEY) then
+            local data = ReadFile(DATA_KEY)
             return HttpService:JSONDecode(data)
         end
         return nil
@@ -116,15 +142,23 @@ local function InitializeAdvancedPerformanceMonitor()
     end
     
     connections.performanceMonitor = RunService.Heartbeat:Connect(function()
-            
-        local currentFPS = math.floor(1 / RunService.RenderStepped:Wait())
-        performanceStats.fps = currentFPS
+        local success, currentFPS = pcall(function()
+            return math.floor(1 / RunService.RenderStepped:Wait())
+        end)
+        performanceStats.fps = success and currentFPS or 0
         
         -- Monitorar memória avançado
-        local graphicsMemory = Stats:GetMemoryUsageMbForTag(Enum.DeveloperMemoryTag.Graphics)
-        local scriptMemory = Stats:GetMemoryUsageMbForTag(Enum.DeveloperMemoryTag.Script)
-        local physicsMemory = Stats:GetMemoryUsageMbForTag(Enum.DeveloperMemoryTag.Physics)
-        performanceStats.memory = math.floor(graphicsMemory + scriptMemory + physicsMemory)
+        local success, graphicsMemory = pcall(function()
+            return Stats:GetMemoryUsageMbForTag(Enum.DeveloperMemoryTag.Graphics) or 0
+        end)
+        local success2, scriptMemory = pcall(function()
+            return Stats:GetMemoryUsageMbForTag(Enum.DeveloperMemoryTag.Script) or 0
+        end)
+        local success3, physicsMemory = pcall(function()
+            return Stats:GetMemoryUsageMbForTag(Enum.DeveloperMemoryTag.Physics) or 0
+        end)
+        
+        performanceStats.memory = math.floor((success and graphicsMemory or 0) + (success2 and scriptMemory or 0) + (success3 and physicsMemory or 0))
         
         -- Monitorar objetos
         performanceStats.objects = #Workspace:GetDescendants()
@@ -134,7 +168,6 @@ end
 -- SISTEMA PLATFORM BUILDER AVANÇADO
 local function CreatePlatform(position)
     if currentPlatformCount >= maxPlatforms then
-        -- Remover plataforma mais antiga
         local oldestPlatform = table.remove(platformParts, 1)
         if oldestPlatform and oldestPlatform:IsDescendantOf(Workspace) then
             oldestPlatform:Destroy()
@@ -165,7 +198,7 @@ local function CreatePlatform(position)
     currentPlatformCount = currentPlatformCount + 1
     
     -- Sistema de destruição automática
-    spawn(function()
+    coroutine.wrap(function()
         wait(platformLifetime)
         if platform and platform:IsDescendantOf(Workspace) then
             platform:Destroy()
@@ -177,7 +210,7 @@ local function CreatePlatform(position)
                 end
             end
         end
-    end)
+    end)()
     
     return platform
 end
@@ -300,7 +333,9 @@ local function ToggleWallhack(state)
         
         -- Limpar conexões
         for _, conn in pairs(wallhackConnections) do
-            conn:Disconnect()
+            if conn then
+                conn:Disconnect()
+            end
         end
         wallhackConnections = {}
         originalCollisions = {}
@@ -435,7 +470,9 @@ local function CreateTeleportGUI()
     end)
     
     closeButton.MouseButton1Click:Connect(function()
-        teleportGui:Destroy()
+        if teleportGui then
+            teleportGui:Destroy()
+        end
     end)
     
     -- Carregar ponto salvo
@@ -668,13 +705,13 @@ local optimizationFunctions = {
                 settings().Rendering.QualityLevel = 1
                 RunService:Set3dRenderingEnabled(true)
                 
-                spawn(function()
+                coroutine.wrap(function()
                     while true do
                         settings().Rendering.EnableFRM = false
                         settings().Rendering.EnableTrees = false
                         wait(15)
                     end
-                end)
+                end)()
             end
         end
     },
@@ -799,13 +836,13 @@ local optimizationFunctions = {
         desc = "Limpeza ultra frequente de memória",
         func = function(state)
             if state then
-                spawn(function()
+                coroutine.wrap(function()
                     while true do
                         wait(10)
                         collectgarbage("collect")
                         collectgarbage("step", 300)
                     end
-                end)
+                end)()
             end
         end
     },
@@ -870,33 +907,32 @@ local optimizationFunctions = {
     },
 
     OptimizeCharacters = {
-    name = "Personagens Otimizados",
-    desc = "Reduz drasticamente detalhes dos personagens",
-    func = function(state)
-        if state then
-            for _, player in pairs(Players:GetPlayers()) do
-                if player.Character then
-                    for _, part in pairs(player.Character:GetDescendants()) do
-                        if part:IsA("Part") or part:IsA("MeshPart") then
-                            part.Material = Enum.Material.Plastic
-                            part.Reflectance = 0
+        name = "Personagens Otimizados",
+        desc = "Reduz drasticamente detalhes dos personagens",
+        func = function(state)
+            if state then
+                for _, player in pairs(Players:GetPlayers()) do
+                    if player.Character then
+                        for _, part in pairs(player.Character:GetDescendants()) do
+                            if part:IsA("Part") or part:IsA("MeshPart") then
+                                part.Material = Enum.Material.Plastic
+                                part.Reflectance = 0
+                            end
                         end
                     end
-                end
-                player.CharacterAdded:Connect(function(character)
-                    wait(1)
-                    for _, part in pairs(character:GetDescendants()) do
-                        if part:IsA("Part") or part:IsA("MeshPart") then
-                            part.Material = Enum.Material.Plastic
-                            part.Reflectance = 0
+                    player.CharacterAdded:Connect(function(character)
+                        wait(1)
+                        for _, part in pairs(character:GetDescendants()) do
+                            if part:IsA("Part") or part:IsA("MeshPart") then
+                                part.Material = Enum.Material.Plastic
+                                part.Reflectance = 0
+                            end
                         end
-                    end
+                    end)
                 end
             end
         end
-    end
-    
-   },
+    },
     
     RemoveLightingEffects = {
         name = "Sem Efeitos de Luz",
@@ -964,21 +1000,22 @@ local optimizationFunctions = {
         desc = "Gestão avançada de memória RAM",
         func = function(state)
             if state then
-                spawn(function()
+                coroutine.wrap(function()
                     while true do
                         wait(20)
                         collectgarbage("collect")
                         settings().Rendering.MeshCacheSize = 0
                         settings().Rendering.TextureCacheSize = 0
                     end
-                end)
+                end)()
             end
         end
     }
 }
 
-ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "VGZINSK V1"
+-- CRIAR A INTERFACE PRINCIPAL
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "VGZINSK_V1"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
@@ -1002,15 +1039,6 @@ InnerGlow.Thickness = 2
 InnerGlow.Color = Color3.fromRGB(255, 0, 255)
 InnerGlow.Transparency = 0.3
 InnerGlow.Parent = MainFrame
-
-local CyberPattern = Instance.new("ImageLabel")
-CyberPattern.Size = UDim2.new(1, 0, 1, 0)
-CyberPattern.BackgroundTransparency = 1
-CyberPattern.Image = "rbxassetid://9892939321"
-CyberPattern.ImageTransparency = 0.9
-CyberPattern.ScaleType = Enum.ScaleType.Tile
-CyberPattern.TileSize = UDim2.new(0, 50, 0, 50)
-CyberPattern.Parent = MainFrame
 
 local Header = Instance.new("Frame")
 Header.Name = "Header"
@@ -1039,6 +1067,7 @@ Title.Font = Enum.Font.GothamBlack
 Title.TextSize = 16
 Title.TextStrokeTransparency = 0.6
 Title.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+Title.Parent = Header
 
 local MinimizeButton = Instance.new("TextButton")
 MinimizeButton.Name = "MinimizeButton"
@@ -1050,6 +1079,7 @@ MinimizeButton.Text = "_"
 MinimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 MinimizeButton.Font = Enum.Font.GothamBold
 MinimizeButton.TextSize = 18
+MinimizeButton.Parent = Header
 
 local CloseButton = Instance.new("TextButton")
 CloseButton.Name = "CloseButton"
@@ -1061,6 +1091,7 @@ CloseButton.Text = "X"
 CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 CloseButton.Font = Enum.Font.GothamBold
 CloseButton.TextSize = 16
+CloseButton.Parent = Header
 
 local MainContainer = Instance.new("ScrollingFrame")
 MainContainer.Name = "MainContainer"
@@ -1160,7 +1191,7 @@ local function CreateCyberToggle(name, description, defaultState, callback, sett
     local isEnabled = defaultState
     
     if isEnabled then
-        callback(true)
+        pcall(callback, true)
         savedSettings[settingKey] = true
     end
     
@@ -1191,7 +1222,7 @@ local function CreateCyberToggle(name, description, defaultState, callback, sett
             TweenService:Create(ToggleKnob, TweenInfo.new(0.3), {Position = UDim2.new(0, 2, 0.5, -10)}):Play()
         end
         
-        callback(isEnabled)
+        pcall(callback, isEnabled)
         
         savedSettings[settingKey] = isEnabled
         SaveSettings()
@@ -1268,7 +1299,7 @@ local function CreatePerformanceDisplay()
     return perfFrame
 end
 
-
+-- CONFIGURAR A INTERFACE
 local currentY = 0
 
 local perfDisplay = CreatePerformanceDisplay()
@@ -1277,7 +1308,6 @@ perfDisplay.Parent = MainContainer
 currentY = currentY + 45
 
 local functionToggles = {
-    
     {key = "autoLoad", name = "🔄 AUTO LOAD", desc = "Carrega configurações automaticamente", func = ToggleAutoLoad, default = false},
     {key = "platformBuilder", name = "🏗️ PLATFORM BUILDER", desc = "Cria plataformas ao pular", func = TogglePlatformBuilder, default = false},
     {key = "wallhack", name = "👻 WALLHACK", desc = "Atravessar paredes sem colisão", func = ToggleWallhack, default = false},
@@ -1302,6 +1332,7 @@ local functionToggles = {
     {key = "RemoveWaterEffects", name = "💧 SEM EFEITOS ÁGUA", desc = "Água completamente simplificada", func = optimizationFunctions.RemoveWaterEffects.func, default = false},
     {key = "SimplifyMaterials", name = "🔷 MATERIAIS SIMPLES", desc = "Todos materiais em plástico", func = optimizationFunctions.SimplifyMaterials.func, default = false},
     {key = "ReduceQuality", name = "📉 QUALIDADE REDUZIDA", desc = "Qualidade geral radicalmente reduzida", func = optimizationFunctions.ReduceQuality.func, default = false},
+    {key = "OptimizeCharacters", name = "👤 PERSONAGENS OTIMIZADOS", desc = "Reduz detalhes dos personagens", func = optimizationFunctions.OptimizeCharacters.func, default = false},
     {key = "RemoveLightingEffects", name = "💫 SEM EFEITOS DE LUZ", desc = "Remove efeitos especiais de luz", func = optimizationFunctions.RemoveLightingEffects.func, default = false},
     {key = "OptimizeTextures", name = "🖌️ TEXTURAS OTIMIZADAS", desc = "Compressão máxima de texturas", func = optimizationFunctions.OptimizeTextures.func, default = false},
     {key = "ReduceParticleQuality", name = "🎇 PARTÍCULAS MÍNIMAS", desc = "Qualidade mínima de partículas", func = optimizationFunctions.ReduceParticleQuality.func, default = false},
@@ -1340,10 +1371,9 @@ resetButton.TextSize = 14
 resetButton.Parent = resetFrame
 
 resetButton.MouseButton1Click:Connect(function()
-        
     for _, toggleData in ipairs(functionToggles) do
         if savedSettings[toggleData.key] then
-            toggleData.func(false)
+            pcall(toggleData.func, false)
             savedSettings[toggleData.key] = false
         end
     end
@@ -1364,27 +1394,25 @@ resetButton.MouseButton1Click:Connect(function()
 end)
 
 currentY = currentY + 50
-
 MainContainer.CanvasSize = UDim2.new(0, 0, 0, currentY + 20)
 
+-- MONTAR A INTERFACE
 Header.Parent = MainFrame
-Title.Parent = Header
-MinimizeButton.Parent = Header
-CloseButton.Parent = Header
 MainContainer.Parent = MainFrame
 MainFrame.Parent = ScreenGui
 ScreenGui.Parent = playerGui
 
-spawn(function()
+-- ANIMAÇÕES
+coroutine.wrap(function()
     while true do
         local time = tick()
         OuterGlow.Color = Color3.fromHSV((time * 0.3) % 1, 0.9, 1)
         InnerGlow.Color = Color3.fromHSV((time * 0.3 + 0.5) % 1, 0.9, 1)
         wait(0.08)
     end
-end)
+end)()
 
-spawn(function()
+coroutine.wrap(function()
     while true do
         TweenService:Create(Title, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
             TextColor3 = Color3.fromRGB(255, 0, 255),
@@ -1397,33 +1425,11 @@ spawn(function()
         }):Play()
         wait(1.5)
     end
-end)
+end)()
 
-local scanLine = Instance.new("Frame")
-scanLine.Size = UDim2.new(1, 0, 0, 2)
-scanLine.Position = UDim2.new(0, 0, 0, 0)
-scanLine.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
-scanLine.BorderSizePixel = 0
-scanLine.BackgroundTransparency = 0.7
-scanLine.Parent = MainFrame
-
-spawn(function()
-    while true do
-        TweenService:Create(scanLine, TweenInfo.new(2, Enum.EasingStyle.Linear), {
-            Position = UDim2.new(0, 0, 1, 0)
-        }):Play()
-        wait(2)
-        scanLine.Position = UDim2.new(0, 0, 0, 0)
-        wait(0.5)
-    end
-end)
-
-local isMinimized = false
-local originalSize = MainFrame.Size
-local originalPosition = MainFrame.Position
-
+-- BOTÕES DA INTERFACE
 MinimizeButton.MouseButton1Click:Connect(function()
-    isMinimized = not isMinimized
+    local isMinimized = MainContainer.Visible
     if isMinimized then
         TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
             Size = UDim2.new(0, 380, 0, 45),
@@ -1433,8 +1439,8 @@ MinimizeButton.MouseButton1Click:Connect(function()
     else
         MainContainer.Visible = true
         TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Size = originalSize,
-            Position = originalPosition
+            Size = UDim2.new(0, 380, 0, 550),
+            Position = UDim2.new(0.5, -190, 0.5, -275)
         }):Play()
     end
 end)
@@ -1503,7 +1509,7 @@ localPlayer.CharacterAdded:Connect(function(character)
                 elseif settingKey == "teleport" then
                     ToggleTeleport(true)
                 elseif optimizationFunctions[settingKey] then
-                    optimizationFunctions[settingKey].func(true)
+                    pcall(optimizationFunctions[settingKey].func, true)
                 end
             end
         end
@@ -1511,16 +1517,17 @@ localPlayer.CharacterAdded:Connect(function(character)
 end)
 
 -- SISTEMA DE AUTO-SAVE
-spawn(function()
+coroutine.wrap(function()
     while true do
         wait(30) -- Salvar a cada 30 segundos
         if autoLoadEnabled then
             SaveSettings()
         end
     end
-end)
+end)()
 
-spawn(function()
+-- VERIFICAÇÃO FINAL
+coroutine.wrap(function()
     wait(5)
     local totalFunctions = 0
     for _ in pairs(optimizationFunctions) do
@@ -1532,10 +1539,11 @@ spawn(function()
     print("💾 Sistema de salvamento: ✅")
     print("🎮 Performance: ✅")
     print("🛡️ Segurança: ✅")
-    print("")
-end)
+    print("⚡ VGZINSK V1 - CARREGADO COM SUCESSO!")
+end)()
 
 return {
     Version = "VGZINSK V1",
     Features = 25,
-    Status = "ACTIVE" }
+    Status = "ACTIVE"
+}
