@@ -44,6 +44,7 @@ local isTeleportMinimized = false
 local mainBubble = nil
 local isMainMinimized = false
 local mainScreenGui = nil
+local mainFrame = nil
 
 local DATA_KEY = "VGZINSK_V1"
 
@@ -115,50 +116,6 @@ local function LoadSettings()
         return result
     end
     return nil
-end
-
--- SISTEMA DE MONITORAMENTO DE PERFORMANCE CORRIGIDO
-local function InitializeAdvancedPerformanceMonitor()
-    if connections.performanceMonitor then
-        connections.performanceMonitor:Disconnect()
-    end
-    
-    connections.performanceMonitor = RunService.Heartbeat:Connect(function()
-        -- FPS usando RenderStepped
-        local fpsSuccess, fpsResult = pcall(function()
-            local time = RunService.RenderStepped:Wait()
-            if time > 0 then
-                return math.floor(1 / time)
-            end
-            return 0
-        end)
-        performanceStats.fps = fpsSuccess and fpsResult or 0
-        
-        -- Memória corrigida
-        local memSuccess, memResult = pcall(function()
-            local totalMemory = 0
-            -- Usando método mais confiável para memória
-            for _, memoryTag in pairs(Enum.DeveloperMemoryTag:GetEnumItems()) do
-                local success, value = pcall(function()
-                    return Stats:GetMemoryUsageMbForTag(memoryTag)
-                end)
-                if success and value then
-                    totalMemory = totalMemory + value
-                end
-            end
-            return math.floor(totalMemory)
-        end)
-        performanceStats.memory = memSuccess and memResult or 0
-        
-        -- Ping usando NetworkClient
-        local pingSuccess, pingResult = pcall(function()
-            return math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
-        end)
-        performanceStats.ping = pingSuccess and pingResult or 0
-        
-        -- Objetos no Workspace
-        performanceStats.objects = #Workspace:GetDescendants()
-    end)
 end
 
 local function InitializeStableFPS()
@@ -380,7 +337,7 @@ local function ToggleWallhack(state)
     SaveSettings()
 end
 
--- SISTEMA TELEPORT AVANÇADO COM NOVAS MECÂNICAS
+-- SISTEMA TELEPORT AVANÇADO COM BOLHA FUNCIONAL
 local function CreateTeleportBubble()
     if teleportBubble and teleportBubble:IsDescendantOf(playerGui) then
         teleportBubble:Destroy()
@@ -442,13 +399,16 @@ local function CreateTeleportBubble()
     bubbleFrame.Parent = teleportBubble
     teleportBubble.Parent = playerGui
     
-    -- Configurar clique para restaurar
+    -- CORREÇÃO: Configurar clique CORRETO para restaurar
     bubbleFrame.MouseButton1Click:Connect(function()
         if teleportGui then
             teleportGui.Enabled = true
             isTeleportMinimized = false
             teleportBubble:Destroy()
             teleportBubble = nil
+        else
+            -- Se o teleportGui foi destruído, criar um novo
+            CreateTeleportGUI()
         end
     end)
     
@@ -501,7 +461,7 @@ local function CreateTeleportGUI()
     minimizeButton.Position = UDim2.new(1, -55, 0, 2)
     minimizeButton.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
     minimizeButton.BorderSizePixel = 0
-    minimizeButton.Text = "_"
+    minimizeButton.Text = "○"
     minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     minimizeButton.Font = Enum.Font.GothamBold
     minimizeButton.TextSize = 16
@@ -548,7 +508,7 @@ local function CreateTeleportGUI()
     teleportButton.TextSize = 12
     teleportButton.Parent = contentFrame
     
-    -- NOVO BOTÃO: Voltar para posição anterior
+    -- Botão Voltar para posição anterior
     local backButton = Instance.new("TextButton")
     backButton.Size = UDim2.new(1, 0, 0, 35)
     backButton.Position = UDim2.new(0, 0, 0, 90)
@@ -713,8 +673,6 @@ local function ToggleAutoLoad(state)
 end
 
 -- ========== SISTEMA DE 24 FUNÇÕES DE OTIMIZAÇÃO AVANÇADAS ==========
--- REMOVIDA: ReduceQuality (função 18)
-
 local optimizationFunctions = {
     RemoveCharacterAnimations = {
         name = "Sem Animações",
@@ -1058,8 +1016,6 @@ local optimizationFunctions = {
         end
     },
     
-    -- REMOVIDA: ReduceQuality (função 18)
-    
     OptimizeCharacters = {
         name = "Personagens Otimizados",
         desc = "Reduz drasticamente detalhes dos personagens",
@@ -1166,18 +1122,15 @@ local optimizationFunctions = {
         end
     },
     
-    -- FUNÇÃO EXTRA PARA COMPENSAR A REMOÇÃO
     AdvancedFPSBoost = {
         name = "Boost de FPS Avançado",
         desc = "Otimização extrema para máximo FPS",
         func = function(state)
             if state then
-                -- Configurações avançadas de performance
                 settings().Rendering.EnableFRM = false
                 settings().Rendering.QualityLevel = 1
                 settings().Physics.PhysicsEnvironmentalThrottle = 2
                 
-                -- Limpeza de objetos desnecessários
                 coroutine.wrap(function()
                     while true do
                         wait(30)
@@ -1193,7 +1146,7 @@ local optimizationFunctions = {
     }
 }
 
--- SISTEMA DE BOLHA PARA MENU PRINCIPAL
+-- SISTEMA DE BOLHA PARA MENU PRINCIPAL CORRIGIDO
 local function CreateMainBubble()
     if mainBubble and mainBubble:IsDescendantOf(playerGui) then
         mainBubble:Destroy()
@@ -1255,118 +1208,153 @@ local function CreateMainBubble()
     bubbleFrame.Parent = mainBubble
     mainBubble.Parent = playerGui
     
-    -- Configurar clique para restaurar menu principal
+    -- CORREÇÃO: Configurar clique CORRETO para restaurar menu principal
     bubbleFrame.MouseButton1Click:Connect(function()
         if mainScreenGui then
             mainScreenGui.Enabled = true
             isMainMinimized = false
             mainBubble:Destroy()
             mainBubble = nil
+        else
+            -- Se o mainScreenGui foi destruído, criar um novo
+            CreateMainGUI()
         end
     end)
     
     return mainBubble
 end
 
-local function MinimizeMainGUI()
-    if mainScreenGui then
-        mainScreenGui.Enabled = false
-        isMainMinimized = true
-        CreateMainBubble()
-    end
-end
-
--- FUNÇÃO DE PERFORMANCE DISPLAY CORRIGIDA
-local function CreatePerformanceDisplay()
-    local perfFrame = Instance.new("Frame")
-    perfFrame.Size = UDim2.new(1, 0, 0, 50)
-    perfFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-    perfFrame.BorderSizePixel = 0
+-- FUNÇÃO PARA CRIAR TOGGLES OTIMIZADA
+local function CreateCyberToggle(name, description, defaultState, callback, settingKey, parentFrame, positionY)
+    local ToggleFrame = Instance.new("Frame")
+    ToggleFrame.Size = UDim2.new(1, 0, 0, 50)
+    ToggleFrame.Position = UDim2.new(0, 0, 0, positionY)
+    ToggleFrame.BackgroundTransparency = 1
+    ToggleFrame.BorderSizePixel = 0
     
-    local perfGradient = Instance.new("UIGradient")
-    perfGradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 40, 60)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 30, 45))
+    local ToggleBG = Instance.new("Frame")
+    ToggleBG.Size = UDim2.new(1, 0, 1, 0)
+    ToggleBG.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+    ToggleBG.BorderSizePixel = 0
+    ToggleBG.Parent = ToggleFrame
+    
+    local ToggleGradient = Instance.new("UIGradient")
+    ToggleGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(35, 35, 55)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 25, 40))
     })
-    perfGradient.Parent = perfFrame
+    ToggleGradient.Parent = ToggleBG
     
-    local fpsLabel = Instance.new("TextLabel")
-    fpsLabel.Size = UDim2.new(0.25, 0, 1, 0)
-    fpsLabel.Position = UDim2.new(0, 0, 0, 0)
-    fpsLabel.BackgroundTransparency = 1
-    fpsLabel.Text = "FPS: 0"
-    fpsLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-    fpsLabel.Font = Enum.Font.GothamBold
-    fpsLabel.TextSize = 12
-    fpsLabel.Parent = perfFrame
+    local ToggleStroke = Instance.new("UIStroke")
+    ToggleStroke.Thickness = 1
+    ToggleStroke.Color = Color3.fromRGB(60, 60, 80)
+    ToggleStroke.Parent = ToggleBG
     
-    local memoryLabel = Instance.new("TextLabel")
-    memoryLabel.Size = UDim2.new(0.25, 0, 1, 0)
-    memoryLabel.Position = UDim2.new(0.25, 0, 0, 0)
-    memoryLabel.BackgroundTransparency = 1
-    memoryLabel.Text = "RAM: 0MB"
-    memoryLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
-    memoryLabel.Font = Enum.Font.GothamBold
-    memoryLabel.TextSize = 12
-    memoryLabel.Parent = perfFrame
+    local Icon = Instance.new("TextLabel")
+    Icon.Size = UDim2.new(0, 30, 0, 30)
+    Icon.Position = UDim2.new(0, 8, 0, 10)
+    Icon.BackgroundTransparency = 1
+    Icon.Text = "🔧"
+    Icon.TextColor3 = Color3.fromRGB(0, 255, 255)
+    Icon.Font = Enum.Font.GothamBold
+    Icon.TextSize = 16
+    Icon.Parent = ToggleFrame
     
-    local pingLabel = Instance.new("TextLabel")
-    pingLabel.Size = UDim2.new(0.25, 0, 1, 0)
-    pingLabel.Position = UDim2.new(0.5, 0, 0, 0)
-    pingLabel.BackgroundTransparency = 1
-    pingLabel.Text = "PING: 0ms"
-    pingLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
-    pingLabel.Font = Enum.Font.GothamBold
-    pingLabel.TextSize = 12
-    pingLabel.Parent = perfFrame
+    local ToggleLabel = Instance.new("TextLabel")
+    ToggleLabel.Size = UDim2.new(0.6, 0, 0.5, 0)
+    ToggleLabel.Position = UDim2.new(0, 45, 0, 5)
+    ToggleLabel.BackgroundTransparency = 1
+    ToggleLabel.Text = name
+    ToggleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ToggleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    ToggleLabel.Font = Enum.Font.GothamBold
+    ToggleLabel.TextSize = 13
+    ToggleLabel.Parent = ToggleFrame
     
-    local objectsLabel = Instance.new("TextLabel")
-    objectsLabel.Size = UDim2.new(0.25, 0, 1, 0)
-    objectsLabel.Position = UDim2.new(0.75, 0, 0, 0)
-    objectsLabel.BackgroundTransparency = 1
-    objectsLabel.Text = "OBJ: 0"
-    objectsLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-    objectsLabel.Font = Enum.Font.GothamBold
-    objectsLabel.TextSize = 12
-    objectsLabel.Parent = perfFrame
+    local DescriptionLabel = Instance.new("TextLabel")
+    DescriptionLabel.Size = UDim2.new(0.6, 0, 0.5, 0)
+    DescriptionLabel.Position = UDim2.new(0, 45, 0.5, 0)
+    DescriptionLabel.BackgroundTransparency = 1
+    DescriptionLabel.Text = description
+    DescriptionLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
+    DescriptionLabel.TextXAlignment = Enum.TextXAlignment.Left
+    DescriptionLabel.Font = Enum.Font.Gotham
+    DescriptionLabel.TextSize = 10
+    DescriptionLabel.Parent = ToggleFrame
     
-    -- Atualização em tempo real CORRIGIDA
-    connections.performanceDisplay = RunService.Heartbeat:Connect(function()
-        fpsLabel.Text = "FPS: " .. performanceStats.fps
-        memoryLabel.Text = "RAM: " .. performanceStats.memory .. "MB"
-        pingLabel.Text = "PING: " .. performanceStats.ping .. "ms"
-        objectsLabel.Text = "OBJ: " .. performanceStats.objects
-        
-        -- Cores dinâmicas baseadas nos valores
-        if performanceStats.fps >= 50 then
-            fpsLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-        elseif performanceStats.fps >= 30 then
-            fpsLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+    local ToggleButton = Instance.new("TextButton")
+    ToggleButton.Size = UDim2.new(0, 50, 0, 25)
+    ToggleButton.Position = UDim2.new(1, -60, 0.5, -12)
+    ToggleButton.BackgroundColor3 = defaultState and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(60, 60, 80)
+    ToggleButton.BorderSizePixel = 0
+    ToggleButton.Text = ""
+    ToggleButton.AutoButtonColor = false
+    ToggleButton.Parent = ToggleFrame
+    
+    local ToggleButtonStroke = Instance.new("UIStroke")
+    ToggleButtonStroke.Thickness = 2
+    ToggleButtonStroke.Color = Color3.fromRGB(100, 100, 120)
+    ToggleButtonStroke.Parent = ToggleButton
+    
+    local ToggleKnob = Instance.new("Frame")
+    ToggleKnob.Size = UDim2.new(0, 21, 0, 21)
+    ToggleKnob.Position = defaultState and UDim2.new(1, -23, 0.5, -10) or UDim2.new(0, 2, 0.5, -10)
+    ToggleKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    ToggleKnob.BorderSizePixel = 0
+    ToggleKnob.Parent = ToggleButton
+    
+    local KnobGradient = Instance.new("UIGradient")
+    KnobGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(220, 220, 220))
+    })
+    KnobGradient.Parent = ToggleKnob
+    
+    local isEnabled = defaultState
+    
+    if isEnabled then
+        pcall(callback, true)
+        savedSettings[settingKey] = true
+    end
+    
+    ToggleButton.MouseEnter:Connect(function()
+        if isEnabled then
+            TweenService:Create(ToggleButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 230, 0)}):Play()
         else
-            fpsLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
-        end
-        
-        if performanceStats.memory < 500 then
-            memoryLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-        elseif performanceStats.memory < 1000 then
-            memoryLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
-        else
-            memoryLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
-        end
-        
-        if performanceStats.ping < 100 then
-            pingLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-        elseif performanceStats.ping < 200 then
-            pingLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
-        else
-            pingLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
+            TweenService:Create(ToggleButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(80, 80, 100)}):Play()
         end
     end)
     
-    return perfFrame
+    ToggleButton.MouseLeave:Connect(function()
+        if isEnabled then
+            TweenService:Create(ToggleButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 200, 0)}):Play()
+        else
+            TweenService:Create(ToggleButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60, 60, 80)}):Play()
+        end
+    end)
+    
+    ToggleButton.MouseButton1Click:Connect(function()
+        isEnabled = not isEnabled
+        
+        if isEnabled then
+            TweenService:Create(ToggleButton, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(0, 200, 0)}):Play()
+            TweenService:Create(ToggleKnob, TweenInfo.new(0.3), {Position = UDim2.new(1, -23, 0.5, -10)}):Play()
+        else
+            TweenService:Create(ToggleButton, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(60, 60, 80)}):Play()
+            TweenService:Create(ToggleKnob, TweenInfo.new(0.3), {Position = UDim2.new(0, 2, 0.5, -10)}):Play()
+        end
+        
+        pcall(callback, isEnabled)
+        
+        savedSettings[settingKey] = isEnabled
+        SaveSettings()
+    end)
+    
+    ToggleFrame.Parent = parentFrame
+    return ToggleFrame
 end
 
--- CRIAR A INTERFACE PRINCIPAL COM SISTEMA DE BOLHA
+-- CRIAR A INTERFACE PRINCIPAL OTIMIZADA
 local function CreateMainGUI()
     if mainScreenGui and mainScreenGui:IsDescendantOf(playerGui) then
         mainScreenGui:Destroy()
@@ -1380,33 +1368,33 @@ local function CreateMainGUI()
     mainScreenGui.ResetOnSpawn = false
     mainScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 400, 0, 600)
-    MainFrame.Position = UDim2.new(0.5, -200, 0.5, -300)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
-    MainFrame.BorderSizePixel = 0
-    MainFrame.Active = true
-    MainFrame.Draggable = true
+    mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MainFrame"
+    mainFrame.Size = UDim2.new(0, 400, 0, 500)
+    mainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Active = true
+    mainFrame.Draggable = true
     
     local OuterGlow = Instance.new("UIStroke")
     OuterGlow.Thickness = 4
     OuterGlow.Color = Color3.fromRGB(0, 255, 255)
     OuterGlow.Transparency = 0.2
-    OuterGlow.Parent = MainFrame
+    OuterGlow.Parent = mainFrame
     
     local InnerGlow = Instance.new("UIStroke")
     InnerGlow.Thickness = 2
     InnerGlow.Color = Color3.fromRGB(255, 0, 255)
     InnerGlow.Transparency = 0.3
-    InnerGlow.Parent = MainFrame
+    InnerGlow.Parent = mainFrame
     
     local Header = Instance.new("Frame")
     Header.Name = "Header"
     Header.Size = UDim2.new(1, 0, 0, 45)
     Header.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
     Header.BorderSizePixel = 0
-    Header.Parent = MainFrame
+    Header.Parent = mainFrame
     
     local HeaderGradient = Instance.new("UIGradient")
     HeaderGradient.Color = ColorSequence.new({
@@ -1465,141 +1453,11 @@ local function CreateMainGUI()
     MainContainer.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 255)
     MainContainer.ScrollBarImageTransparency = 0.5
     MainContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-    MainContainer.Parent = MainFrame
-    
-    -- Adicionar performance display
-    local perfDisplay = CreatePerformanceDisplay()
-    perfDisplay.Parent = MainContainer
-    
-    local currentY = 50
-    
-    -- Função para criar toggles
-    local function CreateCyberToggle(name, description, defaultState, callback, settingKey)
-        local ToggleFrame = Instance.new("Frame")
-        ToggleFrame.Size = UDim2.new(1, 0, 0, 50)
-        ToggleFrame.BackgroundTransparency = 1
-        ToggleFrame.BorderSizePixel = 0
-        
-        local ToggleBG = Instance.new("Frame")
-        ToggleBG.Size = UDim2.new(1, 0, 1, 0)
-        ToggleBG.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
-        ToggleBG.BorderSizePixel = 0
-        ToggleBG.Parent = ToggleFrame
-        
-        local ToggleGradient = Instance.new("UIGradient")
-        ToggleGradient.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(35, 35, 55)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 25, 40))
-        })
-        ToggleGradient.Parent = ToggleBG
-        
-        local ToggleStroke = Instance.new("UIStroke")
-        ToggleStroke.Thickness = 1
-        ToggleStroke.Color = Color3.fromRGB(60, 60, 80)
-        ToggleStroke.Parent = ToggleBG
-        
-        local Icon = Instance.new("TextLabel")
-        Icon.Size = UDim2.new(0, 30, 0, 30)
-        Icon.Position = UDim2.new(0, 8, 0, 10)
-        Icon.BackgroundTransparency = 1
-        Icon.Text = "🔧"
-        Icon.TextColor3 = Color3.fromRGB(0, 255, 255)
-        Icon.Font = Enum.Font.GothamBold
-        Icon.TextSize = 16
-        Icon.Parent = ToggleFrame
-        
-        local ToggleLabel = Instance.new("TextLabel")
-        ToggleLabel.Size = UDim2.new(0.6, 0, 0.5, 0)
-        ToggleLabel.Position = UDim2.new(0, 45, 0, 5)
-        ToggleLabel.BackgroundTransparency = 1
-        ToggleLabel.Text = name
-        ToggleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-        ToggleLabel.TextXAlignment = Enum.TextXAlignment.Left
-        ToggleLabel.Font = Enum.Font.GothamBold
-        ToggleLabel.TextSize = 13
-        ToggleLabel.Parent = ToggleFrame
-        
-        local DescriptionLabel = Instance.new("TextLabel")
-        DescriptionLabel.Size = UDim2.new(0.6, 0, 0.5, 0)
-        DescriptionLabel.Position = UDim2.new(0, 45, 0.5, 0)
-        DescriptionLabel.BackgroundTransparency = 1
-        DescriptionLabel.Text = description
-        DescriptionLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
-        DescriptionLabel.TextXAlignment = Enum.TextXAlignment.Left
-        DescriptionLabel.Font = Enum.Font.Gotham
-        DescriptionLabel.TextSize = 10
-        DescriptionLabel.Parent = ToggleFrame
-        
-        local ToggleButton = Instance.new("TextButton")
-        ToggleButton.Size = UDim2.new(0, 50, 0, 25)
-        ToggleButton.Position = UDim2.new(1, -60, 0.5, -12)
-        ToggleButton.BackgroundColor3 = defaultState and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(60, 60, 80)
-        ToggleButton.BorderSizePixel = 0
-        ToggleButton.Text = ""
-        ToggleButton.AutoButtonColor = false
-        ToggleButton.Parent = ToggleFrame
-        
-        local ToggleButtonStroke = Instance.new("UIStroke")
-        ToggleButtonStroke.Thickness = 2
-        ToggleButtonStroke.Color = Color3.fromRGB(100, 100, 120)
-        ToggleButtonStroke.Parent = ToggleButton
-        
-        local ToggleKnob = Instance.new("Frame")
-        ToggleKnob.Size = UDim2.new(0, 21, 0, 21)
-        ToggleKnob.Position = defaultState and UDim2.new(1, -23, 0.5, -10) or UDim2.new(0, 2, 0.5, -10)
-        ToggleKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        ToggleKnob.BorderSizePixel = 0
-        ToggleKnob.Parent = ToggleButton
-        
-        local KnobGradient = Instance.new("UIGradient")
-        KnobGradient.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(220, 220, 220))
-        })
-        KnobGradient.Parent = ToggleKnob
-        
-        local isEnabled = defaultState
-        
-        if isEnabled then
-            pcall(callback, true)
-            savedSettings[settingKey] = true
-        end
-        
-        ToggleButton.MouseEnter:Connect(function()
-            if isEnabled then
-                TweenService:Create(ToggleButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 230, 0)}):Play()
-            else
-                TweenService:Create(ToggleButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(80, 80, 100)}):Play()
-            end
-        end)
-        
-        ToggleButton.MouseLeave:Connect(function()
-            if isEnabled then
-                TweenService:Create(ToggleButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 200, 0)}):Play()
-            else
-                TweenService:Create(ToggleButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60, 60, 80)}):Play()
-            end
-        end)
-        
-        ToggleButton.MouseButton1Click:Connect(function()
-            isEnabled = not isEnabled
-            
-            if isEnabled then
-                TweenService:Create(ToggleButton, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(0, 200, 0)}):Play()
-                TweenService:Create(ToggleKnob, TweenInfo.new(0.3), {Position = UDim2.new(1, -23, 0.5, -10)}):Play()
-            else
-                TweenService:Create(ToggleButton, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(60, 60, 80)}):Play()
-                TweenService:Create(ToggleKnob, TweenInfo.new(0.3), {Position = UDim2.new(0, 2, 0.5, -10)}):Play()
-            end
-            
-            pcall(callback, isEnabled)
-            
-            savedSettings[settingKey] = isEnabled
-            SaveSettings()
-        end)
-        
-        return ToggleFrame
-    end
+    MainContainer.Parent = mainFrame
+
+    -- REMOVIDO: Performance Display (lixo que ocupava espaço)
+
+    local currentY = 0
 
     -- Lista de toggles (24 funções + 4 principais)
     local functionToggles = {
@@ -1637,15 +1495,15 @@ local function CreateMainGUI()
 
     -- Adicionar todos os toggles
     for i, toggleData in ipairs(functionToggles) do
-        local toggle = CreateCyberToggle(
+        CreateCyberToggle(
             toggleData.name,
             toggleData.desc,
             toggleData.default,
             toggleData.func,
-            toggleData.key
+            toggleData.key,
+            MainContainer,
+            currentY
         )
-        toggle.Position = UDim2.new(0, 0, 0, currentY)
-        toggle.Parent = MainContainer
         currentY = currentY + 55
     end
 
@@ -1679,37 +1537,29 @@ local function CreateMainGUI()
     currentY = currentY + 50
     MainContainer.CanvasSize = UDim2.new(0, 0, 0, currentY + 20)
 
-    -- Configurar botões
+    -- CORREÇÃO: Configurar botões CORRETAMENTE
     MinimizeButton.MouseButton1Click:Connect(function()
-        MinimizeMainGUI()
+        if mainScreenGui then
+            mainScreenGui.Enabled = false
+            isMainMinimized = true
+            CreateMainBubble()
+        end
     end)
 
     CloseButton.MouseButton1Click:Connect(function()
-        mainScreenGui:Destroy()
+        if mainScreenGui then
+            mainScreenGui:Destroy()
+        end
         if mainBubble then
             mainBubble:Destroy()
         end
     end)
 
-    MainFrame.Parent = mainScreenGui
+    mainFrame.Parent = mainScreenGui
     mainScreenGui.Parent = playerGui
 
     return mainScreenGui
 end
-
--- ANIMAÇÕES GLOBAIS
-coroutine.wrap(function()
-    while true do
-        local time = tick()
-        if mainScreenGui and mainScreenGui.Enabled then
-            -- Animação das cores do título
-            TweenService:Create(Title, TweenInfo.new(2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
-                TextColor3 = Color3.fromHSV((time * 0.2) % 1, 0.8, 1)
-            }):Play()
-        end
-        wait(0.1)
-    end
-end)()
 
 -- INICIALIZAÇÃO DO SISTEMA
 coroutine.wrap(function()
@@ -1720,7 +1570,6 @@ coroutine.wrap(function()
     
     -- Inicializar sistemas
     InitializeStableFPS()
-    InitializeAdvancedPerformanceMonitor()
     
     -- Carregar configurações
     local loadedData = LoadSettings()
@@ -1761,9 +1610,9 @@ coroutine.wrap(function()
     end)()
     
     print("⚡ VGZINSK V1 - SISTEMA COMPLETO INICIALIZADO!")
-    print("📊 Performance monitor: ✅ FUNCIONANDO")
-    print("🎯 24 Funções de otimização: ✅ ATIVAS")
-    print("🔧 Sistema de bolha: ✅ IMPLEMENTADO")
-    print("🛡️ Wallhack corrigido: ✅ FUNCIONAL")
-    print("💫 Teleport V2: ✅ OPERACIONAL")
+    print("✅ Sistema de bolha: FUNCIONANDO PERFEITAMENTE")
+    print("✅ 24 Funções de otimização: ATIVAS")
+    print("✅ Wallhack corrigido: OPERACIONAL")
+    print("✅ Teleport V2: FUNCIONAL")
+    print("❌ Performance monitor: REMOVIDO (lixo inútil)")
 end)()
